@@ -30,10 +30,48 @@ struct HNSW
                                              ef_construction_{ef_construction}
     {
     }
+    void Add(const Point &point, int level);
+    std::vector<size_t> SearchLayer(size_t query, size_t enter_point, size_t ef, size_t level);
     size_t M_;
     size_t maxM_;
     size_t maxM0_;
     size_t ef_construction_;
+    size_t enter_point_ = 0;
+    size_t size_ = 0;
+    int max_level_ = -1;
     std::vector<Point> data_;
     std::vector<Layer> layers_;
 };
+
+template <typename Space>
+void HNSW<Space>::Add(const Point &point, int level)
+{
+    data_.push_back(point);
+    size_t index = size_;
+    size_++;
+    size_t enter_point = enter_point_;
+    if (level > max_level_)
+    {
+        for (int i = max_level_ + 1; i <= level; ++i)
+        {
+            if (i == 0)
+            {
+                layers_.push_back(Layer(true));
+            }
+            else
+            {
+                layers_.push_back(Layer(false));
+            }
+            layers_[i].Add(index);
+        }
+        enter_point_ = index;
+        std::swap(level, max_level_);
+    }
+    // TODO
+}
+
+template <typename Space>
+inline std::vector<size_t> HNSW<Space>::SearchLayer(size_t query, size_t enter_point, size_t ef, size_t level)
+{
+    return std::vector<size_t>();
+}

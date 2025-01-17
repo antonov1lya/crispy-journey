@@ -13,7 +13,6 @@ void Layer::Add(size_t index)
 
 size_t Layer::Encoder(size_t index) const
 {
-
     if (bottom_)
     {
         return index;
