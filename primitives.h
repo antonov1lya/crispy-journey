@@ -28,12 +28,13 @@ struct Point
 
 struct SpaceL2
 {
-    FloatType Distance(const struct Point &x, const struct Point &y) const
+    FloatType Distance(const struct Point &x, const struct Point &y)
     {
         FloatType distance = 0;
         for (size_t i = 0; i < x.Size(); ++i)
         {
-            distance += std::pow(x[i] - y[i], 2);
+            FloatType diff = x[i] - y[i];
+            distance += diff * diff;
         }
         return distance;
     }
