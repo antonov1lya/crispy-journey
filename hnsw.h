@@ -21,6 +21,7 @@ struct HNSW
                                                                   ef_construction_{ef_construction}, max_elements_{max_elements}
     {
         was_ = std::vector<size_t>(max_elements_);
+        data_.reserve(max_elements_);
     }
     void Add(const Point &point, int level);
     std::priority_queue<std::pair<float, size_t>,
@@ -128,7 +129,8 @@ HNSW<Space>::SearchLayer(size_t query, size_t enter_point, size_t ef, size_t lev
         size_t current = candidates.top().second;
         candidates.pop();
         FloatType furthest_distance = nearest_neighbours.top().first;
-        if (space_.Distance(data_[current], data_[query]) > furthest_distance)
+        if (space_.Distance(data_[current], data_[query]) > furthest_distance and
+            nearest_neighbours.size() == ef)
         {
             break;
         }
@@ -157,6 +159,18 @@ HNSW<Space>::SearchLayer(size_t query, size_t enter_point, size_t ef, size_t lev
 template <typename Space>
 inline std::vector<size_t> HNSW<Space>::SelectNeighbours(size_t query, std::priority_queue<std::pair<float, size_t>, std::vector<std::pair<float, size_t>>, std::less<std::pair<float, size_t>>> &candidates, size_t M)
 {
+    if (candidates.size() < M)
+    {
+        std::vector<size_t> array;
+        array.reserve(candidates.size());
+        while (!candidates.empty())
+        {
+            array.push_back(candidates.top().second);
+            candidates.pop();
+        }
+        std::reverse(array.begin(), array.end());
+        return array;
+    }
     std::vector<std::pair<float, size_t>> queue;
     queue.reserve(candidates.size());
     while (!candidates.empty())
