@@ -52,6 +52,7 @@ void HNSW<Space>::Add(const Point &point, int level)
         for (int i = max_level_ + 1; i <= level; ++i)
         {
             layers_.push_back(Layer());
+            layers_.back().graph_.reserve(max_elements_);
             enter_points_.push_back(index);
         }
         max_level_ = level;
@@ -115,8 +116,8 @@ inline std::vector<size_t> HNSW<Space>::SearchLayer(size_t query, size_t enter_p
     {
         size_t current = candidates.top().second;
         candidates.pop();
-        size_t furthest = nearest_neighbours.top().second;
-        if (space_.Distance(data_[current], data_[query]) > space_.Distance(data_[furthest], data_[query]))
+        FloatType furthest_distance = nearest_neighbours.top().first;
+        if (space_.Distance(data_[current], data_[query]) > furthest_distance)
         {
             break;
         }
@@ -125,9 +126,9 @@ inline std::vector<size_t> HNSW<Space>::SearchLayer(size_t query, size_t enter_p
             if (was_[next]!=current_was_)
             {
                 was_[next]=current_was_;
-                furthest = nearest_neighbours.top().second;
+                furthest_distance = nearest_neighbours.top().first;
                 FloatType distance = space_.Distance(data_[next], data_[query]);
-                if (distance < space_.Distance(data_[furthest], data_[query]) or nearest_neighbours.size() < ef)
+                if (distance < furthest_distance or nearest_neighbours.size() < ef)
                 {
                     candidates.emplace(distance, next);
                     nearest_neighbours.emplace(distance, next);
