@@ -17,9 +17,10 @@ struct Layer
 template <typename Space>
 struct HNSW
 {
-    HNSW(size_t M, size_t ef_construction) : M_{M}, maxM_{M}, maxM0_{2 * M},
-                                             ef_construction_{ef_construction}
+    HNSW(size_t M, size_t ef_construction, size_t max_elements) : M_{M}, maxM_{M}, maxM0_{2 * M},
+                                             ef_construction_{ef_construction}, max_elements_{max_elements}
     {
+        was_ = std::vector<size_t>(max_elements_);
     }
     void Add(const Point &point, int level);
     std::vector<size_t> SearchLayer(size_t query, size_t enter_point, size_t ef, size_t level);
@@ -35,6 +36,9 @@ struct HNSW
     std::vector<Point> data_;
     std::vector<Layer> layers_;
     Space space_;
+    std::vector<size_t>was_;
+    size_t current_was_;
+    size_t max_elements_;
 };
 
 template <typename Space>
@@ -68,6 +72,7 @@ void HNSW<Space>::Add(const Point &point, int level)
             }
         }
         auto nearest_neighbors = SearchLayer(index, enter_point, ef_construction_, i);
+        enter_point = nearest_neighbors[0];
         if (nearest_neighbors.size() > M_)
         {
             nearest_neighbors.resize(M_);
@@ -93,8 +98,8 @@ template <typename Space>
 inline std::vector<size_t> HNSW<Space>::SearchLayer(size_t query, size_t enter_point, size_t ef, size_t level)
 {
     Layer &layer = layers_[level];
-    std::unordered_set<size_t> was;
-    was.insert(enter_point);
+    ++current_was_;
+    was_[enter_point]=current_was_;
     std::priority_queue<std::pair<float, size_t>,
                         std::vector<std::pair<float, size_t>>,
                         std::greater<std::pair<float, size_t>>>
@@ -117,9 +122,9 @@ inline std::vector<size_t> HNSW<Space>::SearchLayer(size_t query, size_t enter_p
         }
         for (size_t next : layer.graph_[current])
         {
-            if (was.find(next) == was.end())
+            if (was_[next]!=current_was_)
             {
-                was.insert(next);
+                was_[next]=current_was_;
                 furthest = nearest_neighbours.top().second;
                 FloatType distance = space_.Distance(data_[next], data_[query]);
                 if (distance < space_.Distance(data_[furthest], data_[query]) or nearest_neighbours.size() < ef)
