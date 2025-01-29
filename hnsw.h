@@ -27,8 +27,10 @@ struct Layer
 template <typename Space>
 struct HNSW
 {
-    HNSW(size_t M, size_t ef_construction, size_t max_elements) : M_{M}, maxM_{M}, maxM0_{2 * M},
-                                                                  ef_construction_{ef_construction}, max_elements_{max_elements}
+    HNSW(size_t M,
+         size_t ef_construction,
+         size_t max_elements) : M_{M}, maxM_{M}, maxM0_{2 * M},
+                                ef_construction_{ef_construction}, max_elements_{max_elements}
     {
         was_ = std::vector<size_t>(max_elements_);
         data_.reserve(max_elements_);
@@ -147,7 +149,7 @@ inline QueueLess HNSW<Space>::SearchLayer(size_t query, size_t enter_point, size
 }
 
 template <typename Space>
-inline std::vector<size_t> HNSW<Space>::SelectNeighbours(size_t query, std::priority_queue<std::pair<float, size_t>, std::vector<std::pair<float, size_t>>, std::less<std::pair<float, size_t>>> &candidates, size_t M)
+inline std::vector<size_t> HNSW<Space>::SelectNeighbours(size_t query, QueueLess &candidates, size_t M)
 {
     if (candidates.size() < M)
     {
