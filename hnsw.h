@@ -9,14 +9,14 @@
 
 #include "primitives.h"
 
-typedef std::priority_queue<std::pair<float, size_t>,
-                            std::vector<std::pair<float, size_t>>,
-                            std::less<std::pair<float, size_t>>>
+typedef std::priority_queue<std::pair<FloatType, size_t>,
+                            std::vector<std::pair<FloatType, size_t>>,
+                            std::less<std::pair<FloatType, size_t>>>
     QueueLess;
 
-typedef std::priority_queue<std::pair<float, size_t>,
-                            std::vector<std::pair<float, size_t>>,
-                            std::greater<std::pair<float, size_t>>>
+typedef std::priority_queue<std::pair<FloatType, size_t>,
+                            std::vector<std::pair<FloatType, size_t>>,
+                            std::greater<std::pair<FloatType, size_t>>>
     QueueGreater;
 
 struct Layer
@@ -27,10 +27,8 @@ struct Layer
 template <typename Space>
 struct HNSW
 {
-    HNSW(size_t M,
-         size_t ef_construction,
-         size_t max_elements) : M_{M}, maxM_{M}, maxM0_{2 * M},
-                                ef_construction_{ef_construction}, max_elements_{max_elements}
+    HNSW(size_t M, size_t ef_construction, size_t max_elements) : M_{M}, maxM_{M}, maxM0_{2 * M},
+                                                                  ef_construction_{ef_construction}, max_elements_{max_elements}
     {
         was_ = std::vector<size_t>(max_elements_);
         data_.reserve(max_elements_);
@@ -81,10 +79,7 @@ void HNSW<Space>::Add(const Point &point, int level)
             }
             if (layers_[i].graph_[next].size() > maxM)
             {
-                std::priority_queue<std::pair<float, size_t>,
-                                    std::vector<std::pair<float, size_t>>,
-                                    std::less<std::pair<float, size_t>>>
-                    queue;
+                QueueLess queue;
                 for (size_t neighbour : layers_[i].graph_[next])
                 {
                     queue.emplace(space_.Distance(data_[next], data_[neighbour]), neighbour);
@@ -163,7 +158,7 @@ inline std::vector<size_t> HNSW<Space>::SelectNeighbours(size_t query, QueueLess
         std::reverse(array.begin(), array.end());
         return array;
     }
-    std::vector<std::pair<float, size_t>> queue;
+    std::vector<std::pair<FloatType, size_t>> queue;
     queue.reserve(candidates.size());
     while (!candidates.empty())
     {
