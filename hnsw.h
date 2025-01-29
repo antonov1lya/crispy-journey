@@ -9,6 +9,16 @@
 
 #include "primitives.h"
 
+typedef std::priority_queue<std::pair<float, size_t>,
+                            std::vector<std::pair<float, size_t>>,
+                            std::less<std::pair<float, size_t>>>
+    QueueLess;
+
+typedef std::priority_queue<std::pair<float, size_t>,
+                            std::vector<std::pair<float, size_t>>,
+                            std::greater<std::pair<float, size_t>>>
+    QueueGreater;
+
 struct Layer
 {
     std::unordered_map<size_t, std::vector<size_t>> graph_;
@@ -24,17 +34,14 @@ struct HNSW
         data_.reserve(max_elements_);
     }
     void Add(const Point &point, int level);
-    std::priority_queue<std::pair<float, size_t>,
-                        std::vector<std::pair<float, size_t>>,
-                        std::less<std::pair<float, size_t>>>
-    SearchLayer(size_t query, size_t enter_point, size_t ef, size_t level);
-    std::vector<size_t> SelectNeighbours(size_t query, std::priority_queue<std::pair<float, size_t>, std::vector<std::pair<float, size_t>>, std::less<std::pair<float, size_t>>> &candidates, size_t M);
+    QueueLess SearchLayer(size_t query, size_t enter_point, size_t ef, size_t level);
+    std::vector<size_t> SelectNeighbours(size_t query, QueueLess &candidates, size_t M);
     std::vector<size_t> Search(size_t query, size_t K, size_t ef);
     size_t M_;
     size_t maxM_;
     size_t maxM0_;
     size_t ef_construction_;
-    std::vector<size_t> enter_points_;
+    size_t enter_point_;
     size_t size_ = 0;
     int max_level_ = -1;
     std::vector<Point> data_;
@@ -51,31 +58,13 @@ void HNSW<Space>::Add(const Point &point, int level)
     data_.push_back(point);
     size_t index = size_;
     ++size_;
-    if (level > max_level_)
-    {
-        for (int i = max_level_ + 1; i <= level; ++i)
-        {
-            layers_.push_back(Layer());
-            layers_.back().graph_.reserve(max_elements_);
-            enter_points_.push_back(index);
-        }
-        max_level_ = level;
-    }
-    size_t enter_point = enter_points_[max_level_];
+    size_t enter_point = enter_point_;
     for (int i = max_level_; i > level; --i)
     {
         enter_point = SearchLayer(index, enter_point, 1, i).top().second;
     }
     for (int i = std::min(max_level_, level); i >= 0; --i)
     {
-        if (enter_point == index)
-        {
-            enter_point = enter_points_[i];
-            if (enter_point == index)
-            {
-                continue;
-            }
-        }
         auto nearest_neighbors = SearchLayer(index, enter_point, ef_construction_, i);
         layers_[i].graph_[index] = SelectNeighbours(index, nearest_neighbors, M_);
         enter_point = layers_[i].graph_[index][0];
@@ -102,27 +91,28 @@ void HNSW<Space>::Add(const Point &point, int level)
             }
         }
     }
+    if (level > max_level_)
+    {
+        for (int i = max_level_ + 1; i <= level; ++i)
+        {
+            layers_.push_back(Layer());
+            layers_.back().graph_.reserve(max_elements_);
+        }
+        max_level_ = level;
+        enter_point_ = size_ - 1;
+    }
 }
 
 template <typename Space>
-inline std::priority_queue<std::pair<float, size_t>,
-                           std::vector<std::pair<float, size_t>>,
-                           std::less<std::pair<float, size_t>>>
-HNSW<Space>::SearchLayer(size_t query, size_t enter_point, size_t ef, size_t level)
+inline QueueLess HNSW<Space>::SearchLayer(size_t query, size_t enter_point, size_t ef, size_t level)
 {
     Layer &layer = layers_[level];
     ++current_was_;
     was_[enter_point] = current_was_;
-    std::priority_queue<std::pair<float, size_t>,
-                        std::vector<std::pair<float, size_t>>,
-                        std::greater<std::pair<float, size_t>>>
-        candidates;
+    QueueGreater candidates;
     FloatType enter_point_distance = space_.Distance(data_[enter_point], data_[query]);
     candidates.emplace(enter_point_distance, enter_point);
-    std::priority_queue<std::pair<float, size_t>,
-                        std::vector<std::pair<float, size_t>>,
-                        std::less<std::pair<float, size_t>>>
-        nearest_neighbours;
+    QueueLess nearest_neighbours;
     nearest_neighbours.emplace(enter_point_distance, enter_point);
     while (!candidates.empty())
     {
@@ -162,7 +152,7 @@ inline std::vector<size_t> HNSW<Space>::SelectNeighbours(size_t query, std::prio
     if (candidates.size() < M)
     {
         std::vector<size_t> array;
-        array.reserve(candidates.size());
+        array.reserve(maxM0_);
         while (!candidates.empty())
         {
             array.push_back(candidates.top().second);
@@ -180,7 +170,7 @@ inline std::vector<size_t> HNSW<Space>::SelectNeighbours(size_t query, std::prio
     }
     std::reverse(queue.begin(), queue.end());
     std::vector<size_t> selected;
-    selected.reserve(M);
+    selected.reserve(maxM0_);
     for (auto &[dist, element] : queue)
     {
         if (selected.size() >= M)
@@ -201,14 +191,13 @@ inline std::vector<size_t> HNSW<Space>::SelectNeighbours(size_t query, std::prio
             selected.push_back(element);
         }
     }
-
     return selected;
 }
 
 template <typename Space>
 inline std::vector<size_t> HNSW<Space>::Search(size_t query, size_t K, size_t ef)
 {
-    size_t enter_point = enter_points_[max_level_];
+    size_t enter_point = enter_point_;
     for (size_t i = max_level_; i >= 1; --i)
     {
         enter_point = SearchLayer(query, enter_point, 1, i).top().second;
