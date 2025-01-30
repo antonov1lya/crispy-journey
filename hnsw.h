@@ -1,11 +1,12 @@
 #pragma once
 
-#include <vector>
-#include <unordered_map>
-#include <unordered_set>
-#include <queue>
+#include <algorithm>
 #include <functional>
 #include <iostream>
+#include <queue>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 #include "primitives.h"
 
@@ -102,8 +103,7 @@ void HNSW<Space>::Add(const Point &point, int level)
 template <typename Space>
 inline QueueLess HNSW<Space>::SearchLayer(size_t query, size_t enter_point, size_t ef, size_t level)
 {
-    ++current_was_;
-    was_[enter_point] = current_was_;
+    was_[enter_point] = ++current_was_;
     QueueGreater candidates;
     FloatType enter_point_distance = space_.Distance(data_[enter_point], data_[query]);
     candidates.emplace(enter_point_distance, enter_point);
@@ -166,7 +166,7 @@ inline std::vector<size_t> HNSW<Space>::SelectNeighbours(size_t query, QueueLess
     std::reverse(queue.begin(), queue.end());
     std::vector<size_t> selected;
     selected.reserve(maxM + 1);
-    for (auto &[dist, element] : queue)
+    for (auto &[distance, element] : queue)
     {
         if (selected.size() >= M)
         {
@@ -175,8 +175,8 @@ inline std::vector<size_t> HNSW<Space>::SelectNeighbours(size_t query, QueueLess
         bool good = true;
         for (size_t neighbour : selected)
         {
-            FloatType curdist = space_.Distance(data_[element], data_[neighbour]);
-            if (curdist < dist)
+            FloatType cur_distance = space_.Distance(data_[element], data_[neighbour]);
+            if (cur_distance < distance)
             {
                 good = false;
             }
