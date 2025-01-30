@@ -40,7 +40,7 @@ struct HNSW
     }
     void Add(const Point &point, int level);
     QueueLess SearchLayer(size_t query, size_t enter_point, size_t ef, size_t level);
-    std::vector<size_t> SelectNeighbours(size_t query, QueueLess &candidates, size_t M);
+    std::vector<size_t> SelectNeighbours(size_t query, QueueLess &candidates, size_t M, size_t maxM);
     std::vector<size_t> Search(size_t query, size_t K, size_t ef);
     size_t M_;
     size_t maxM_;
@@ -48,13 +48,13 @@ struct HNSW
     size_t ef_construction_;
     size_t enter_point_;
     size_t size_ = 0;
-    int max_level_ = -1;
-    std::vector<Point> data_;
-    Space space_;
-    std::vector<size_t> was_;
     size_t current_was_;
     size_t max_elements_;
+    int max_level_ = -1;
+    std::vector<Point> data_;
+    std::vector<size_t> was_;
     std::vector<Node> graph_;
+    Space space_;
 };
 
 template <typename Space>
@@ -62,8 +62,7 @@ void HNSW<Space>::Add(const Point &point, int level)
 {
     data_.push_back(point);
     graph_.push_back(Node(level));
-    size_t index = size_;
-    ++size_;
+    size_t index = size_++;
     size_t enter_point = enter_point_;
     for (int i = max_level_; i > level; --i)
     {
@@ -71,18 +70,17 @@ void HNSW<Space>::Add(const Point &point, int level)
     }
     for (int i = std::min(max_level_, level); i >= 0; --i)
     {
+        size_t maxM = maxM_;
+        if (i == 0)
+        {
+            maxM = maxM0_;
+        }
         auto nearest_neighbors = SearchLayer(index, enter_point, ef_construction_, i);
-        graph_[index].neighbors_[i] = SelectNeighbours(index, nearest_neighbors, M_);
+        graph_[index].neighbors_[i] = SelectNeighbours(index, nearest_neighbors, M_, maxM);
         enter_point = graph_[index].neighbors_[i][0];
-
         for (size_t next : graph_[index].neighbors_[i])
         {
             graph_[next].neighbors_[i].push_back(index);
-            size_t maxM = maxM_;
-            if (i == 0)
-            {
-                maxM = maxM0_;
-            }
             if (graph_[next].neighbors_[i].size() > maxM)
             {
                 QueueLess queue;
@@ -90,7 +88,7 @@ void HNSW<Space>::Add(const Point &point, int level)
                 {
                     queue.emplace(space_.Distance(data_[next], data_[neighbour]), neighbour);
                 }
-                graph_[next].neighbors_[i] = SelectNeighbours(next, queue, maxM);
+                graph_[next].neighbors_[i] = SelectNeighbours(next, queue, maxM, maxM);
             }
         }
     }
@@ -144,12 +142,12 @@ inline QueueLess HNSW<Space>::SearchLayer(size_t query, size_t enter_point, size
 }
 
 template <typename Space>
-inline std::vector<size_t> HNSW<Space>::SelectNeighbours(size_t query, QueueLess &candidates, size_t M)
+inline std::vector<size_t> HNSW<Space>::SelectNeighbours(size_t query, QueueLess &candidates, size_t M, size_t maxM)
 {
     if (candidates.size() < M)
     {
         std::vector<size_t> array;
-        array.reserve(maxM0_);
+        array.reserve(maxM + 1);
         while (!candidates.empty())
         {
             array.push_back(candidates.top().second);
@@ -167,7 +165,7 @@ inline std::vector<size_t> HNSW<Space>::SelectNeighbours(size_t query, QueueLess
     }
     std::reverse(queue.begin(), queue.end());
     std::vector<size_t> selected;
-    selected.reserve(maxM0_);
+    selected.reserve(maxM + 1);
     for (auto &[dist, element] : queue)
     {
         if (selected.size() >= M)
