@@ -19,9 +19,13 @@ typedef std::priority_queue<std::pair<FloatType, size_t>,
                             std::greater<std::pair<FloatType, size_t>>>
     QueueGreater;
 
-struct Layer
+struct Node
 {
-    std::unordered_map<size_t, std::vector<size_t>> graph_;
+    Node(size_t max_level)
+    {
+        neighbors_.resize(max_level + 1);
+    }
+    std::vector<std::vector<size_t>> neighbors_;
 };
 
 template <typename Space>
@@ -32,6 +36,7 @@ struct HNSW
     {
         was_ = std::vector<size_t>(max_elements_);
         data_.reserve(max_elements_);
+        graph_.reserve(max_elements_);
     }
     void Add(const Point &point, int level);
     QueueLess SearchLayer(size_t query, size_t enter_point, size_t ef, size_t level);
@@ -45,17 +50,18 @@ struct HNSW
     size_t size_ = 0;
     int max_level_ = -1;
     std::vector<Point> data_;
-    std::vector<Layer> layers_;
     Space space_;
     std::vector<size_t> was_;
     size_t current_was_;
     size_t max_elements_;
+    std::vector<Node> graph_;
 };
 
 template <typename Space>
 void HNSW<Space>::Add(const Point &point, int level)
 {
     data_.push_back(point);
+    graph_.push_back(Node(level));
     size_t index = size_;
     ++size_;
     size_t enter_point = enter_point_;
@@ -66,44 +72,38 @@ void HNSW<Space>::Add(const Point &point, int level)
     for (int i = std::min(max_level_, level); i >= 0; --i)
     {
         auto nearest_neighbors = SearchLayer(index, enter_point, ef_construction_, i);
-        layers_[i].graph_[index] = SelectNeighbours(index, nearest_neighbors, M_);
-        enter_point = layers_[i].graph_[index][0];
+        graph_[index].neighbors_[i] = SelectNeighbours(index, nearest_neighbors, M_);
+        enter_point = graph_[index].neighbors_[i][0];
 
-        for (size_t next : layers_[i].graph_[index])
+        for (size_t next : graph_[index].neighbors_[i])
         {
-            layers_[i].graph_[next].push_back(index);
+            graph_[next].neighbors_[i].push_back(index);
             size_t maxM = maxM_;
             if (i == 0)
             {
                 maxM = maxM0_;
             }
-            if (layers_[i].graph_[next].size() > maxM)
+            if (graph_[next].neighbors_[i].size() > maxM)
             {
                 QueueLess queue;
-                for (size_t neighbour : layers_[i].graph_[next])
+                for (size_t neighbour : graph_[next].neighbors_[i])
                 {
                     queue.emplace(space_.Distance(data_[next], data_[neighbour]), neighbour);
                 }
-                layers_[i].graph_[next] = SelectNeighbours(next, queue, maxM);
+                graph_[next].neighbors_[i] = SelectNeighbours(next, queue, maxM);
             }
         }
     }
     if (level > max_level_)
     {
-        for (int i = max_level_ + 1; i <= level; ++i)
-        {
-            layers_.push_back(Layer());
-            layers_.back().graph_.reserve(max_elements_);
-        }
         max_level_ = level;
-        enter_point_ = size_ - 1;
+        enter_point_ = index;
     }
 }
 
 template <typename Space>
 inline QueueLess HNSW<Space>::SearchLayer(size_t query, size_t enter_point, size_t ef, size_t level)
 {
-    Layer &layer = layers_[level];
     ++current_was_;
     was_[enter_point] = current_was_;
     QueueGreater candidates;
@@ -121,7 +121,7 @@ inline QueueLess HNSW<Space>::SearchLayer(size_t query, size_t enter_point, size
         {
             break;
         }
-        for (size_t next : layer.graph_[current])
+        for (size_t next : graph_[current].neighbors_[level])
         {
             if (was_[next] != current_was_)
             {
