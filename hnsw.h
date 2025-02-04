@@ -4,9 +4,8 @@
 #include <functional>
 #include <iostream>
 #include <queue>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
+#include <fstream>
 
 #include "primitives.h"
 
@@ -39,17 +38,19 @@ struct HNSW
         data_.reserve(max_elements_);
         graph_.reserve(max_elements_);
     }
+    HNSW(std::ifstream &file);
     void Add(const Point &point, int level);
     QueueLess SearchLayer(size_t query, size_t enter_point, size_t ef, size_t level);
     std::vector<size_t> SelectNeighbours(size_t query, QueueLess &candidates, size_t M, size_t maxM);
     std::vector<size_t> Search(size_t query, size_t K, size_t ef);
+    void Save(std::ofstream &file);
     size_t M_;
     size_t maxM_;
     size_t maxM0_;
     size_t ef_construction_;
     size_t enter_point_;
     size_t size_ = 0;
-    size_t current_was_;
+    size_t current_was_ = 0;
     size_t max_elements_;
     int max_level_ = -1;
     std::vector<Point> data_;
@@ -211,4 +212,87 @@ inline std::vector<size_t> HNSW<Space>::Search(size_t query, size_t K, size_t ef
     }
     std::reverse(array.begin(), array.end());
     return array;
+}
+
+template <typename Space>
+inline void HNSW<Space>::Save(std::ofstream &file)
+{
+    file << size_ << "\n";
+    file << enter_point_ << "\n";
+    file << M_ << "\n";
+    file << ef_construction_ << "\n";
+    file << max_level_ << "\n";
+    size_t dim = data_[0].Size();
+    file << dim << "\n";
+    for (size_t node = 0; node < size_; ++node)
+    {
+        for (size_t i = 0; i < dim; ++i)
+        {
+            file << data_[node][i] << " ";
+        }
+        file << "\n";
+    }
+    for (size_t node = 0; node < size_; ++node)
+    {
+        file << graph_[node].neighbors_.size() << '\n';
+        for (size_t level = 0; level < graph_[node].neighbors_.size(); ++level)
+        {
+            file << graph_[node].neighbors_[level].size() << " ";
+            for (size_t neighbour : graph_[node].neighbors_[level])
+            {
+                file << neighbour << " ";
+            }
+            file << "\n";
+        }
+    }
+}
+
+template <typename Space>
+inline HNSW<Space>::HNSW(std::ifstream &file)
+{
+    file >> size_;
+    graph_.reserve(size_);
+    was_ = std::vector<size_t>(size_);
+    max_elements_ = size_;
+    file >> enter_point_;
+    file >> M_;
+    maxM_ = M_;
+    maxM0_ = 2 * M_;
+    file >> ef_construction_;
+    file >> max_level_;
+    size_t dim;
+    file >> dim;
+    data_ = std::vector<Point>(size_, Point(dim));
+    for (size_t node = 0; node < size_; ++node)
+    {
+        for (size_t i = 0; i < dim; ++i)
+        {
+            file >> data_[node][i];
+        }
+    }
+    for (size_t node = 0; node < size_; ++node)
+    {
+        size_t level_number;
+        file >> level_number;
+        graph_.push_back(Node(level_number - 1));
+        for (size_t level = 0; level < level_number; ++level)
+        {
+            if (level == 0)
+            {
+                graph_[node].neighbors_[level].reserve(maxM0_);
+            }
+            else
+            {
+                graph_[node].neighbors_[level].reserve(maxM_);
+            }
+            size_t neighbour_number;
+            file >> neighbour_number;
+            for (size_t it = 0; it < neighbour_number; ++it)
+            {
+                size_t neighbour;
+                file >> neighbour;
+                graph_[node].neighbors_[level].push_back(neighbour);
+            }
+        }
+    }
 }
