@@ -3,34 +3,35 @@
 #include <vector>
 
 typedef float FloatType;
+typedef int IntType;
 
 struct Point
 {
-    explicit Point(size_t n)
+    explicit Point(IntType n)
     {
         data_.resize(n);
     }
-    size_t Size() const
+    IntType Size() const
     {
         return data_.size();
     }
-    FloatType &operator[](size_t i)
+    FloatType &operator[](IntType i)
     {
         return data_[i];
     }
-    FloatType operator[](size_t i) const
+    FloatType operator[](IntType i) const
     {
         return data_[i];
     }
     void Normalize()
     {
         FloatType norm = 0;
-        for (size_t i = 0; i < data_.size(); ++i)
+        for (IntType i = 0; i < data_.size(); ++i)
         {
             norm += data_[i] * data_[i];
         }
         norm = sqrt(norm);
-        for (size_t i = 0; i < data_.size(); ++i)
+        for (IntType i = 0; i < data_.size(); ++i)
         {
             data_[i] /= norm;
         }
@@ -41,7 +42,7 @@ struct Point
 Point operator-(Point &a, Point &b)
 {
     Point result(a.Size());
-    for (size_t i = 0; i < a.Size(); ++i)
+    for (IntType i = 0; i < a.Size(); ++i)
     {
         result[i] = a[i] - b[i];
     }
@@ -54,7 +55,7 @@ struct SpaceL2
     {
         ++computations_;
         FloatType distance = 0;
-        for (size_t i = 0; i < x.Size(); ++i)
+        for (IntType i = 0; i < x.Size(); ++i)
         {
             FloatType diff = x[i] - y[i];
             distance += diff * diff;
@@ -64,13 +65,13 @@ struct SpaceL2
     FloatType Cos(const struct Point &x, const struct Point &y)
     {
         FloatType result = 0;
-        for (size_t i = 0; i < x.Size(); ++i)
+        for (IntType i = 0; i < x.Size(); ++i)
         {
             result += x[i] * y[i];
         }
         return result;
     }
-    size_t GetComputationsNumber()
+    IntType GetComputationsNumber()
     {
         return computations_;
     }
@@ -78,5 +79,5 @@ struct SpaceL2
     {
         computations_ = 0;
     }
-    size_t computations_ = 0;
+    IntType computations_ = 0;
 };
