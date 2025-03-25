@@ -79,5 +79,5 @@ struct SpaceL2
     {
         computations_ = 0;
     }
-    IntType computations_ = 0;
+    size_t computations_ = 0;
 };

@@ -10,8 +10,9 @@
 
 #include "primitives.h"
 
-#define MEMORY_OPTIMIZATION
+// #define MEMORY_OPTIMIZATION
 // #define LONG_VECTOR
+#define REORDER
 
 typedef std::priority_queue<std::pair<FloatType, IntType>,
                             std::vector<std::pair<FloatType, IntType>>,
@@ -52,6 +53,9 @@ struct HNSW
     void MemoryManager(IntType upper_threshold = 200000);
     void AddNeighborhood(IntType i, IntType j);
     void AddNeighborhood(IntType i);
+    void ReOrdering();
+    IntType DfsStat(IntType cur);
+    void DfsReorder(IntType cur);
 
     void Improve();
     void Save(std::ofstream &file, IntType precision = 1);
@@ -70,6 +74,13 @@ struct HNSW
 
     std::vector<IntType> A0_;
     std::vector<IntType> B0_;
+
+    std::vector<std::vector<IntType>> bfs_tree_;
+    std::vector<IntType> dfs_stat_;
+    std::vector<IntType> reorder_to_new_;
+    std::vector<IntType> reorder_to_old_;
+    IntType reorder_num = 0;
+
     IntType size0_ = 0;
 
     Space space_;
@@ -498,6 +509,123 @@ inline void HNSW<Space>::AddNeighborhood(IntType i)
 }
 
 template <typename Space>
+inline void HNSW<Space>::ReOrdering()
+{
+    std::vector<FloatType> means1(data_[0].Size());
+    for (int i = 0; i < size_; ++i)
+    {
+        for (int j = 0; j < means1.size(); ++j)
+        {
+            means1[j] += data_[i][j];
+        }
+    }
+    for (int j = 0; j < means1.size(); ++j)
+    {
+        means1[j] /= size_;
+    }
+    Point meansOne(means1.size());
+    for (int i = 0; i < means1.size(); ++i)
+    {
+        meansOne[i] = means1[i];
+    }
+    FloatType best_dist = 1e9, best_i = -1;
+    for (int i = 0; i < size_; ++i)
+    {
+        if (space_.Distance(data_[i], meansOne) < best_dist)
+        {
+            best_dist = space_.Distance(data_[i], meansOne);
+            best_i = i;
+        }
+    }
+
+    std::queue<IntType> queue;
+    bfs_tree_.resize(size_);
+    std::vector<bool> was(size_);
+    was[best_i] = 1;
+    queue.push(best_i);
+    int cnt = 0;
+    while (!queue.empty())
+    {
+        ++cnt;
+        int cur = queue.front();
+        queue.pop();
+        for (auto next : graph_[cur].neighbors_[0])
+        {
+            if (!was[next])
+            {
+                was[next] = 1;
+                queue.push(next);
+                bfs_tree_[cur].push_back(next);
+            }
+        }
+    }
+    dfs_stat_ = std::vector<IntType>(size_);
+    DfsStat(best_i);
+    reorder_to_new_ = std::vector<IntType>(size_);
+    reorder_to_old_ = std::vector<IntType>(size_);
+    DfsReorder(best_i);
+
+    std::vector<Node> graph_new_;
+    for (IntType i = 0; i < size_; i++)
+    {
+        int old_id = reorder_to_old_[i];
+        graph_new_.push_back(Node(static_cast<int>(graph_[old_id].neighbors_.size()) - 1));
+        for (int j = 0; j < graph_[old_id].neighbors_.size(); ++j)
+        {
+            if (j == 0)
+            {
+                graph_new_[i].neighbors_[j].reserve(maxM0_);
+            }
+            else
+            {
+                graph_new_[i].neighbors_[j].reserve(maxM_);
+            }
+            for (int k : graph_[old_id].neighbors_[j])
+            {
+                graph_new_[i].neighbors_[j].push_back(reorder_to_new_[k]);
+            }
+        }
+    }
+    graph_ = graph_new_;
+    enter_point_ = reorder_to_new_[enter_point_];
+    std::vector<Point> data_new_(size_, Point(data_[0].Size()));
+    for (int i = 0; i < size_; ++i)
+    {
+        data_new_[i] = data_[reorder_to_old_[i]];
+    }
+    data_ = data_new_;
+}
+
+template <typename Space>
+inline IntType HNSW<Space>::DfsStat(IntType cur)
+{
+    dfs_stat_[cur] = 1;
+    for (auto next : bfs_tree_[cur])
+    {
+        dfs_stat_[cur] += DfsStat(next);
+    }
+    return dfs_stat_[cur];
+}
+
+template <typename Space>
+inline void HNSW<Space>::DfsReorder(IntType cur)
+{
+    std::vector<std::pair<IntType, IntType>> queue;
+    for (auto next : bfs_tree_[cur])
+    {
+        queue.push_back({dfs_stat_[next], next});
+    }
+    std::sort(queue.begin(), queue.end());
+    std::reverse(queue.begin(), queue.end());
+    for (auto &[prioriter, next] : queue)
+    {
+        DfsReorder(next);
+    }
+    reorder_to_new_[cur] = reorder_num++;
+    reorder_to_old_[reorder_to_new_[cur]] = cur;
+}
+
+template <typename Space>
 inline std::vector<IntType> HNSW<Space>::Search(Point &query, IntType K, IntType ef)
 {
     IntType enter_point = enter_point_;
@@ -518,7 +646,11 @@ inline std::vector<IntType> HNSW<Space>::Search(Point &query, IntType K, IntType
     array.reserve(nearest_neighbours.size());
     while (!nearest_neighbours.empty())
     {
+#ifdef REORDER
+        array.push_back(reorder_to_old_[nearest_neighbours.top().second]);
+#else
         array.push_back(nearest_neighbours.top().second);
+#endif
         nearest_neighbours.pop();
     }
     std::reverse(array.begin(), array.end());
@@ -604,6 +736,11 @@ inline void HNSW<Space>::Save(std::ofstream &file, IntType precision)
             file << "\n";
         }
     }
+    file << reorder_to_old_.size() << "\n";
+    for (IntType node : reorder_to_old_)
+    {
+        file << node << " ";
+    }
     file << A0_.size() << "\n";
     for (IntType node : A0_)
     {
@@ -665,6 +802,13 @@ inline HNSW<Space>::HNSW(std::ifstream &file)
                 graph_[node].neighbors_[level].push_back(neighbour);
             }
         }
+    }
+    IntType reorder_old_size;
+    file >> reorder_old_size;
+    reorder_to_old_.resize(reorder_old_size);
+    for (int i = 0; i < reorder_old_size; ++i)
+    {
+        file >> reorder_to_old_[i];
     }
     IntType A0size;
     file >> A0size;
