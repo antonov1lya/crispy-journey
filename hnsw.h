@@ -13,6 +13,7 @@
 // #define MEMORY_OPTIMIZATION
 // #define LONG_VECTOR
 #define REORDER
+#define THRESHOLD 1
 
 typedef std::priority_queue<std::pair<FloatType, IntType>,
                             std::vector<std::pair<FloatType, IntType>>,
@@ -511,6 +512,7 @@ inline void HNSW<Space>::AddNeighborhood(IntType i)
 template <typename Space>
 inline void HNSW<Space>::ReOrdering()
 {
+
     std::vector<FloatType> means1(data_[0].Size());
     for (int i = 0; i < size_; ++i)
     {
@@ -564,7 +566,130 @@ inline void HNSW<Space>::ReOrdering()
     reorder_to_new_ = std::vector<IntType>(size_);
     reorder_to_old_ = std::vector<IntType>(size_);
     DfsReorder(best_i);
+    // улучшение реордеринга
 
+    std::vector<std::vector<IntType>> graph_inv_(size_);
+    for (int i = 0; i < size_; ++i)
+    {
+        for (int j : graph_[i].neighbors_[0])
+        {
+            graph_inv_[j].push_back(i);
+        }
+    }
+
+    auto GetScore = [=](int i, int j)
+    {
+        int64_t score = 0;
+        for (int k : graph_[i].neighbors_[0])
+        {
+            score += abs(reorder_to_new_[i] - reorder_to_new_[k]) > THRESHOLD;
+        }
+        for (int k : graph_[j].neighbors_[0])
+        {
+            score += abs(reorder_to_new_[j] - reorder_to_new_[k]) > THRESHOLD;
+        }
+        for (int k : graph_inv_[i])
+        {
+            score += abs(reorder_to_new_[i] - reorder_to_new_[k]) > THRESHOLD;
+        }
+        for (int k : graph_inv_[j])
+        {
+            score += abs(reorder_to_new_[j] - reorder_to_new_[k]) > THRESHOLD;
+        }
+        return score;
+    };
+
+    int64_t sum = 0;
+    int64_t sum_old = 0;
+    for (int i = 0; i < size_; ++i)
+    {
+        for (int j : graph_[i].neighbors_[0])
+        {
+            sum_old += abs(i - j) > THRESHOLD;
+            sum += abs(reorder_to_new_[i] - reorder_to_new_[j]) > THRESHOLD;
+        }
+    }
+    std::cout << sum_old << "\n";
+    std::cout << sum << "\n";
+
+    for (int _ = 0; _ < 10; _++)
+    {
+        std::cout << _ << "\n";
+        for (int i = 0; i < size_; ++i)
+        {
+            for (int j : graph_[i].neighbors_[0])
+            {
+                int64_t score_old = GetScore(i, j);
+                std::swap(reorder_to_new_[i], reorder_to_new_[j]);
+                int64_t score_new = GetScore(i, j);
+                if (score_new - score_old < 0)
+                {
+                    continue;
+                }
+                else
+                {
+                    std::swap(reorder_to_new_[i], reorder_to_new_[j]);
+                }
+            }
+        }
+    }
+
+    sum = 0;
+    for (int i = 0; i < size_; ++i)
+    {
+        for (int j : graph_[i].neighbors_[0])
+        {
+            sum += abs(reorder_to_new_[i] - reorder_to_new_[j]) > THRESHOLD;
+        }
+    }
+    std::cout << sum << "\n";
+
+    /*
+        reorder_to_new_ = std::vector<IntType>(size_);
+        reorder_to_old_ = std::vector<IntType>(size_);
+        std::vector<bool> visited(size_);
+        for (int i = 0; i < size_; ++i)
+        {
+            if (graph_[i].neighbors_.size() > 1)
+            {
+                if (!visited[i])
+                {
+                    visited[i] = true;
+                    reorder_to_new_[i] = reorder_num++;
+                    for (auto j : graph_[i].neighbors_[0])
+                    {
+                        if (!visited[j] and graph_[j].neighbors_.size() == 1)
+                        {
+                            reorder_to_new_[j] = reorder_num++;
+                            visited[j] = true;
+                        }
+                    }
+                }
+            }
+        }
+        std::cout << reorder_num << "\n";
+        for (int i = 0; i < size_; i++)
+        {
+            if (!visited[i])
+            {
+                visited[i] = true;
+                reorder_to_new_[i] = reorder_num++;
+            }
+            for (auto j : graph_[i].neighbors_[0])
+            {
+                if (!visited[j])
+                {
+                    reorder_to_new_[j] = reorder_num++;
+                    visited[j] = true;
+                }
+            }
+        }
+    */
+    // перезапись графа
+    for (IntType i = 0; i < size_; ++i)
+    {
+        reorder_to_old_[reorder_to_new_[i]] = i;
+    }
     std::vector<Node> graph_new_;
     for (IntType i = 0; i < size_; i++)
     {
@@ -622,7 +747,7 @@ inline void HNSW<Space>::DfsReorder(IntType cur)
         DfsReorder(next);
     }
     reorder_to_new_[cur] = reorder_num++;
-    reorder_to_old_[reorder_to_new_[cur]] = cur;
+    // reorder_to_old_[reorder_to_new_[cur]] = cur;
 }
 
 template <typename Space>

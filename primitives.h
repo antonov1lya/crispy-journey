@@ -5,6 +5,8 @@
 typedef float FloatType;
 typedef int IntType;
 
+#define SIZE 128
+
 struct Point
 {
     explicit Point(IntType n)
@@ -13,7 +15,7 @@ struct Point
     }
     IntType Size() const
     {
-        return data_.size();
+        return SIZE;
     }
     FloatType &operator[](IntType i)
     {
@@ -55,7 +57,7 @@ struct SpaceL2
     {
         ++computations_;
         FloatType distance = 0;
-        for (IntType i = 0; i < x.Size(); ++i)
+        for (IntType i = 0; i < SIZE; ++i)
         {
             FloatType diff = x[i] - y[i];
             distance += diff * diff;
