@@ -13,8 +13,8 @@
 
 // #define MEMORY_OPTIMIZATION
 // #define LONG_VECTOR
-#define REORDER
-#define THRESHOLD 100000
+// #define REORDER
+// #define THRESHOLD 100000
 
 typedef std::priority_queue<std::pair<FloatType, IntType>,
                             std::vector<std::pair<FloatType, IntType>>,
@@ -64,7 +64,7 @@ struct HNSW {
     void DfsReorder(IntType cur);
 
     void Improve();
-    void Save(std::ofstream& file, IntType precision = 1);
+    void Save(std::ofstream& file, IntType precision = 6);
     IntType M_;
     IntType maxM_;
     IntType maxM0_;
@@ -78,8 +78,8 @@ struct HNSW {
     std::vector<IntType> was_;
     std::vector<Node> graph_;
 
-    std::vector<IntType> A0_;
-    std::vector<IntType> B0_;
+    // std::vector<IntType> A0_;
+    // std::vector<IntType> B0_;
 
     std::vector<std::vector<IntType>> bfs_tree_;
     std::vector<IntType> dfs_stat_;
@@ -399,51 +399,51 @@ inline std::vector<IntType> HNSW<Space>::SSG(IntType node, std::vector<IntType>&
 //     }
 // }
 
-template <typename Space>
-inline void HNSW<Space>::AddNeighborhood(IntType i, IntType j) {
-    std::set<IntType> i_minus_j;
-    std::set<IntType> j_minus_i;
-    std::set<IntType> intersection;
-    for (IntType element : graph_[i].neighbors_[0]) {
-        i_minus_j.insert(element);
-    }
-    for (IntType element : graph_[j].neighbors_[0]) {
-        if (i_minus_j.count(element)) {
-            intersection.insert(element);
-        } else {
-            j_minus_i.insert(element);
-        }
-    }
-    for (IntType element : intersection) {
-        i_minus_j.erase(element);
-    }
-    B0_[2 * i] = size0_;
-    for (auto x : i_minus_j) {
-        A0_.push_back(x);
-        size0_++;
-    }
-    B0_[2 * j] = size0_;
-    for (auto x : intersection) {
-        A0_.push_back(x);
-        size0_++;
-    }
-    B0_[2 * i + 1] = size0_;
-    for (auto x : j_minus_i) {
-        A0_.push_back(x);
-        size0_++;
-    }
-    B0_[2 * j + 1] = size0_;
-}
+// template <typename Space>
+// inline void HNSW<Space>::AddNeighborhood(IntType i, IntType j) {
+//     std::set<IntType> i_minus_j;
+//     std::set<IntType> j_minus_i;
+//     std::set<IntType> intersection;
+//     for (IntType element : graph_[i].neighbors_[0]) {
+//         i_minus_j.insert(element);
+//     }
+//     for (IntType element : graph_[j].neighbors_[0]) {
+//         if (i_minus_j.count(element)) {
+//             intersection.insert(element);
+//         } else {
+//             j_minus_i.insert(element);
+//         }
+//     }
+//     for (IntType element : intersection) {
+//         i_minus_j.erase(element);
+//     }
+//     B0_[2 * i] = size0_;
+//     for (auto x : i_minus_j) {
+//         A0_.push_back(x);
+//         size0_++;
+//     }
+//     B0_[2 * j] = size0_;
+//     for (auto x : intersection) {
+//         A0_.push_back(x);
+//         size0_++;
+//     }
+//     B0_[2 * i + 1] = size0_;
+//     for (auto x : j_minus_i) {
+//         A0_.push_back(x);
+//         size0_++;
+//     }
+//     B0_[2 * j + 1] = size0_;
+// }
 
-template <typename Space>
-inline void HNSW<Space>::AddNeighborhood(IntType i) {
-    B0_[2 * i] = size0_;
-    for (auto x : graph_[i].neighbors_[0]) {
-        A0_.push_back(x);
-        size0_++;
-    }
-    B0_[2 * i + 1] = size0_;
-}
+// template <typename Space>
+// inline void HNSW<Space>::AddNeighborhood(IntType i) {
+//     B0_[2 * i] = size0_;
+//     for (auto x : graph_[i].neighbors_[0]) {
+//         A0_.push_back(x);
+//         size0_++;
+//     }
+//     B0_[2 * i + 1] = size0_;
+// }
 
 template <typename Space>
 inline void HNSW<Space>::TreeReOrdering() {
@@ -603,15 +603,22 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
     }
     std::cout << sum << "\n";
     std::cout << "START\n";
-    for (int _ = 0; _ < 50; _++) {
+    for (int _ = 0; _ < 100; _++) {
         std::cout << _ << "\n";
 
         for (int i = 0; i < size_; ++i) {
             if (i % 10000 == 0) {
                 std::cout << i << "\n";
             }
-            for (int j = reorder_to_new_[i] + 1; (j <= reorder_to_new_[i] + 30) and (j < size_);
-                 ++j) {
+            // for (int j = reorder_to_new_[i] + 1; (j <= reorder_to_new_[i] + 30) and (j < size_);
+            //      ++j) {
+            for (int jj = 2; jj <= 61; ++jj) {
+                int sign = 1;
+                if (jj % 2)
+                    sign = -1;
+                int j = reorder_to_new_[i] + sign * (jj / 2);
+                if (!(0 <= j and j < size_))
+                    continue;
                 // if (i == j) {
                 //     continue;
                 // }
@@ -648,108 +655,108 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
     }
 }
 
-template <typename Space>
-inline void HNSW<Space>::SumOfAbs() {
-    reorder_to_new_ = std::vector<IntType>(size_);
-    for (int i = 0; i < size_; ++i) {
-        reorder_to_new_[i] = i;
-    }
-    reorder_to_old_ = std::vector<IntType>(size_);
-    for (int i = 0; i < size_; ++i) {
-        reorder_to_old_[i] = i;
-    }
+// template <typename Space>
+// inline void HNSW<Space>::SumOfAbs() {
+//     reorder_to_new_ = std::vector<IntType>(size_);
+//     for (int i = 0; i < size_; ++i) {
+//         reorder_to_new_[i] = i;
+//     }
+//     reorder_to_old_ = std::vector<IntType>(size_);
+//     for (int i = 0; i < size_; ++i) {
+//         reorder_to_old_[i] = i;
+//     }
 
-    std::vector<std::vector<IntType>> graph_inv_(size_);
-    for (int i = 0; i < size_; ++i) {
-        for (int j : graph_[i].neighbors_[0]) {
-            graph_inv_[j].push_back(i);
-        }
-    }
-    int64_t kParam = 100000;
-    // sum of abs
-    auto ScoreF = [=](int i, int j) {
-        int64_t mn = 1e9;
-        for (int l = 0; l <= 5; ++l) {
-            mn = std::min(mn, abs(reorder_to_new_[i] - reorder_to_new_[j] + l * kParam));
-        }
-        return mn;
-    };
+//     std::vector<std::vector<IntType>> graph_inv_(size_);
+//     for (int i = 0; i < size_; ++i) {
+//         for (int j : graph_[i].neighbors_[0]) {
+//             graph_inv_[j].push_back(i);
+//         }
+//     }
+//     int64_t kParam = 100000;
+//     // sum of abs
+//     auto ScoreF = [=](int i, int j) {
+//         int64_t mn = 1e9;
+//         for (int l = 0; l <= 5; ++l) {
+//             mn = std::min(mn, abs(reorder_to_new_[i] - reorder_to_new_[j] + l * kParam));
+//         }
+//         return mn;
+//     };
 
-    auto GetScore = [=](int i, int j) {
-        int64_t score = 0;
-        for (int k : graph_[i].neighbors_[0]) {
-            score += ScoreF(i, k);
-        }
-        for (int k : graph_[j].neighbors_[0]) {
-            score += ScoreF(j, k);
-        }
-        for (int k : graph_inv_[i]) {
-            score += ScoreF(i, k);
-        }
-        for (int k : graph_inv_[j]) {
-            score += ScoreF(j, k);
-        }
-        return score;
-    };
+//     auto GetScore = [=](int i, int j) {
+//         int64_t score = 0;
+//         for (int k : graph_[i].neighbors_[0]) {
+//             score += ScoreF(i, k);
+//         }
+//         for (int k : graph_[j].neighbors_[0]) {
+//             score += ScoreF(j, k);
+//         }
+//         for (int k : graph_inv_[i]) {
+//             score += ScoreF(i, k);
+//         }
+//         for (int k : graph_inv_[j]) {
+//             score += ScoreF(j, k);
+//         }
+//         return score;
+//     };
 
-    int64_t sum = 0;
-    for (int i = 0; i < size_; ++i) {
-        for (int j : graph_[i].neighbors_[0]) {
-            sum += ScoreF(i, j);
-        }
-    }
-    std::cout << sum << "\n";
-    std::cout << "START\n";
+//     int64_t sum = 0;
+//     for (int i = 0; i < size_; ++i) {
+//         for (int j : graph_[i].neighbors_[0]) {
+//             sum += ScoreF(i, j);
+//         }
+//     }
+//     std::cout << sum << "\n";
+//     std::cout << "START\n";
 
-    std::vector<int64_t> grid;
-    for (int i = 0; i <= 5; ++i) {
-        for (int j = 1; j <= 30; ++j) {
-            grid.push_back(i * kParam + j);
-        }
-    }
+//     std::vector<int64_t> grid;
+//     for (int i = 0; i <= 5; ++i) {
+//         for (int j = 1; j <= 30; ++j) {
+//             grid.push_back(i * kParam + j);
+//         }
+//     }
 
-    for (int _ = 0; _ < 2; _++) {
-        std::cout << _ << "\n";
+//     for (int _ = 0; _ < 2; _++) {
+//         std::cout << _ << "\n";
 
-        for (int i = 0; i < size_; ++i) {
-            if (i % 10000 == 0) {
-                std::cout << i << "\n";
-            }
-            for (int j : grid) {
-                int curj = reorder_to_new_[i] + j;
-                if (curj >= size_)
-                    continue;
-                // if (i == j) {
-                //     continue;
-                // }
-                int64_t l = reorder_to_old_[curj];
-                int64_t mn_score = 0, index = -1;
-                for (int ne : graph_[i].neighbors_[0]) {
-                    int64_t score_old = GetScore(l, ne);
-                    std::swap(reorder_to_new_[l], reorder_to_new_[ne]);
-                    int64_t score_new = GetScore(l, ne);
-                    if (score_new - score_old < mn_score) {
-                        mn_score = score_new - score_old;
-                        index = ne;
-                    }
-                    std::swap(reorder_to_new_[l], reorder_to_new_[ne]);
-                }
-                if (mn_score < 0) {
-                    std::swap(reorder_to_new_[l], reorder_to_new_[index]);
-                    std::swap(reorder_to_old_[reorder_to_new_[l]],
-                              reorder_to_old_[reorder_to_new_[index]]);
-                }
-            }
-        }
-        sum = 0;
-        for (int ii = 0; ii < size_; ++ii) {
-            for (int jj : graph_[ii].neighbors_[0]) {
-                sum += ScoreF(ii, jj);
-            }
-        }
-        std::cout << sum << "\n";
-    }
-}
+//         for (int i = 0; i < size_; ++i) {
+//             if (i % 10000 == 0) {
+//                 std::cout << i << "\n";
+//             }
+//             for (int j : grid) {
+//                 int curj = reorder_to_new_[i] + j;
+//                 if (curj >= size_)
+//                     continue;
+//                 // if (i == j) {
+//                 //     continue;
+//                 // }
+//                 int64_t l = reorder_to_old_[curj];
+//                 int64_t mn_score = 0, index = -1;
+//                 for (int ne : graph_[i].neighbors_[0]) {
+//                     int64_t score_old = GetScore(l, ne);
+//                     std::swap(reorder_to_new_[l], reorder_to_new_[ne]);
+//                     int64_t score_new = GetScore(l, ne);
+//                     if (score_new - score_old < mn_score) {
+//                         mn_score = score_new - score_old;
+//                         index = ne;
+//                     }
+//                     std::swap(reorder_to_new_[l], reorder_to_new_[ne]);
+//                 }
+//                 if (mn_score < 0) {
+//                     std::swap(reorder_to_new_[l], reorder_to_new_[index]);
+//                     std::swap(reorder_to_old_[reorder_to_new_[l]],
+//                               reorder_to_old_[reorder_to_new_[index]]);
+//                 }
+//             }
+//         }
+//         sum = 0;
+//         for (int ii = 0; ii < size_; ++ii) {
+//             for (int jj : graph_[ii].neighbors_[0]) {
+//                 sum += ScoreF(ii, jj);
+//             }
+//         }
+//         std::cout << sum << "\n";
+//     }
+// }
 
 template <typename Space>
 inline void HNSW<Space>::ReOrdering() {
@@ -757,112 +764,6 @@ inline void HNSW<Space>::ReOrdering() {
     SumOfModulesReOrdering();
     // TreeReOrdering();
     GraphReWrite();
-    // // улучшение реордеринга
-    // // START
-    // std::vector<std::vector<IntType>> graph_inv_(size_);
-    // for (int i = 0; i < size_; ++i) {
-    //     for (int j : graph_[i].neighbors_[0]) {
-    //         graph_inv_[j].push_back(i);
-    //     }
-    // }
-
-    // auto GetScore = [=](int i, int j) {
-    //     int64_t score = 0;
-    //     for (int k : graph_[i].neighbors_[0]) {
-    //         score += abs(reorder_to_new_[i] - reorder_to_new_[k]) > THRESHOLD;
-    //     }
-    //     for (int k : graph_[j].neighbors_[0]) {
-    //         score += abs(reorder_to_new_[j] - reorder_to_new_[k]) > THRESHOLD;
-    //     }
-    //     for (int k : graph_inv_[i]) {
-    //         score += abs(reorder_to_new_[i] - reorder_to_new_[k]) > THRESHOLD;
-    //     }
-    //     for (int k : graph_inv_[j]) {
-    //         score += abs(reorder_to_new_[j] - reorder_to_new_[k]) > THRESHOLD;
-    //     }
-    //     return score;
-    // };
-
-    // int64_t sum = 0;
-    // int64_t sum_old = 0;
-    // for (int i = 0; i < size_; ++i) {
-    //     for (int j : graph_[i].neighbors_[0]) {
-    //         sum_old += abs(i - j) > THRESHOLD;
-    //         sum += abs(reorder_to_new_[i] - reorder_to_new_[j]) > THRESHOLD;
-    //     }
-    // }
-    // std::cout << sum_old << "\n";
-    // std::cout << sum << "\n";
-
-    // for (int _ = 0; _ < 10; _++) {
-    //     std::cout << _ << "\n";
-    //     for (int i = 0; i < size_; ++i) {
-    //         for (int j : graph_[i].neighbors_[0]) {
-    //             int64_t score_old = GetScore(i, j);
-    //             std::swap(reorder_to_new_[i], reorder_to_new_[j]);
-    //             int64_t score_new = GetScore(i, j);
-    //             if (score_new - score_old < 0) {
-    //                 continue;
-    //             } else {
-    //                 std::swap(reorder_to_new_[i], reorder_to_new_[j]);
-    //             }
-    //         }
-    //     }
-    // }
-
-    // sum = 0;
-    // for (int i = 0; i < size_; ++i) {
-    //     for (int j : graph_[i].neighbors_[0]) {
-    //         sum += abs(reorder_to_new_[i] - reorder_to_new_[j]) > THRESHOLD;
-    //     }
-    // }
-    // std::cout << sum << "\n";
-    // END
-    /*
-        reorder_to_new_ = std::vector<IntType>(size_);
-        reorder_to_old_ = std::vector<IntType>(size_);
-        std::vector<bool> visited(size_);
-        for (int i = 0; i < size_; ++i)
-        {
-            if (graph_[i].neighbors_.size() > 1)
-            {
-                if (!visited[i])
-                {
-                    visited[i] = true;
-                    reorder_to_new_[i] = reorder_num++;
-                    for (auto j : graph_[i].neighbors_[0])
-                    {
-                        if (!visited[j] and graph_[j].neighbors_.size() == 1)
-                        {
-                            reorder_to_new_[j] = reorder_num++;
-                            visited[j] = true;
-                        }
-                    }
-                }
-            }
-        }
-        std::cout << reorder_num << "\n";
-        for (int i = 0; i < size_; i++)
-        {
-            if (!visited[i])
-            {
-                visited[i] = true;
-                reorder_to_new_[i] = reorder_num++;
-            }
-            for (auto j : graph_[i].neighbors_[0])
-            {
-                if (!visited[j])
-                {
-                    reorder_to_new_[j] = reorder_num++;
-                    visited[j] = true;
-                }
-            }
-        }
-    */
-    // перезапись графа
-    // for (IntType i = 0; i < size_; ++i) {
-    //     reorder_to_old_[reorder_to_new_[i]] = i;
-    // }
 }
 
 template <typename Space>
