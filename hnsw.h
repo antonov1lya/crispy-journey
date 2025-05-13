@@ -42,15 +42,19 @@ struct HNSW {
           ef_construction_{ef_construction},
           max_elements_{max_elements} {
         was_ = std::vector<IntType>(max_elements_);
-        data_.reserve(max_elements_);
+        // data_.reserve(max_elements_);
         graph_.reserve(max_elements_);
+        data_long_ = static_cast<float*>(aligned_alloc(64, (max_elements * SIZE) * sizeof(float)));
     }
     HNSW(std::ifstream& file);
-    void Add(const Point& point, int level);
-    QueueLess SearchLayer(Point& query, IntType enter_point, IntType ef, IntType level);
-    QueueLess SearchLayer0(Point& query, IntType enter_point, IntType ef, IntType level);
+    ~HNSW() {
+        free(data_long_);
+    }
+    void Add(int level);
+    QueueLess SearchLayer(FloatType* query, IntType enter_point, IntType ef, IntType level);
+    // QueueLess SearchLayer0(Point& query, IntType enter_point, IntType ef, IntType level);
     std::vector<IntType> SelectNeighbours(QueueLess& candidates, IntType M, IntType maxM);
-    std::vector<IntType> Search(Point& query, IntType K, IntType ef);
+    std::vector<IntType> Search(FloatType* query, IntType K, IntType ef);
     std::vector<IntType> SSG(IntType node, std::vector<IntType>& candidates, IntType M);
     void MemoryManager(IntType upper_threshold = 200000);
     void AddNeighborhood(IntType i, IntType j);
@@ -74,7 +78,9 @@ struct HNSW {
     IntType current_was_ = 0;
     IntType max_elements_;
     int max_level_ = -1;
-    std::vector<Point> data_;
+    // std::vector<Point> data_;
+    FloatType* data_long_;
+    // std::vector<FloatType> data_long_;
     std::vector<IntType> was_;
     std::vector<Node> graph_;
 
@@ -94,20 +100,21 @@ struct HNSW {
 };
 
 template <typename Space>
-void HNSW<Space>::Add(const Point& point, int level) {
-    data_.push_back(point);
+void HNSW<Space>::Add(int level) {
+    // data_.push_back(point);
     graph_.push_back(Node(level));
     IntType index = size_++;
     IntType enter_point = enter_point_;
     for (int i = max_level_; i > level; --i) {
-        enter_point = SearchLayer(data_[index], enter_point, 1, i).top().second;
+        enter_point = SearchLayer(&(data_long_[index * SIZE]), enter_point, 1, i).top().second;
     }
     for (int i = std::min(max_level_, level); i >= 0; --i) {
         IntType maxM = maxM_;
         if (i == 0) {
             maxM = maxM0_;
         }
-        auto nearest_neighbors = SearchLayer(data_[index], enter_point, ef_construction_, i);
+        auto nearest_neighbors =
+            SearchLayer(&(data_long_[index * SIZE]), enter_point, ef_construction_, i);
         graph_[index].neighbors_[i] = SelectNeighbours(nearest_neighbors, M_, maxM);
         enter_point = graph_[index].neighbors_[i][0];
         for (IntType next : graph_[index].neighbors_[i]) {
@@ -115,7 +122,9 @@ void HNSW<Space>::Add(const Point& point, int level) {
             if (graph_[next].neighbors_[i].size() > maxM) {
                 QueueLess queue;
                 for (IntType neighbour : graph_[next].neighbors_[i]) {
-                    queue.emplace(space_.Distance(data_[next], data_[neighbour]), neighbour);
+                    queue.emplace(space_.Distance(&(data_long_[next * SIZE]),
+                                                  &(data_long_[neighbour * SIZE])),
+                                  neighbour);
                 }
                 graph_[next].neighbors_[i] = SelectNeighbours(queue, maxM, maxM);
             }
@@ -128,11 +137,11 @@ void HNSW<Space>::Add(const Point& point, int level) {
 }
 
 template <typename Space>
-inline QueueLess HNSW<Space>::SearchLayer(Point& query, IntType enter_point, IntType ef,
+inline QueueLess HNSW<Space>::SearchLayer(FloatType* query, IntType enter_point, IntType ef,
                                           IntType level) {
     was_[enter_point] = ++current_was_;
     QueueGreater candidates;
-    FloatType enter_point_distance = space_.Distance(data_[enter_point], query);
+    FloatType enter_point_distance = space_.Distance(&(data_long_[enter_point * SIZE]), query);
     candidates.emplace(enter_point_distance, enter_point);
     QueueLess nearest_neighbours;
     nearest_neighbours.emplace(enter_point_distance, enter_point);
@@ -140,7 +149,7 @@ inline QueueLess HNSW<Space>::SearchLayer(Point& query, IntType enter_point, Int
         IntType current = candidates.top().second;
         candidates.pop();
         FloatType furthest_distance = nearest_neighbours.top().first;
-        if (space_.Distance(data_[current], query) > furthest_distance and
+        if (space_.Distance(&(data_long_[current * SIZE]), query) > furthest_distance and
             nearest_neighbours.size() == ef) {
             break;
         }
@@ -148,7 +157,7 @@ inline QueueLess HNSW<Space>::SearchLayer(Point& query, IntType enter_point, Int
             if (was_[next] != current_was_) {
                 was_[next] = current_was_;
                 furthest_distance = nearest_neighbours.top().first;
-                FloatType distance = space_.Distance(data_[next], query);
+                FloatType distance = space_.Distance(&(data_long_[next * SIZE]), query);
                 if (distance < furthest_distance or nearest_neighbours.size() < ef) {
                     candidates.emplace(distance, next);
                     nearest_neighbours.emplace(distance, next);
@@ -243,7 +252,8 @@ inline std::vector<IntType> HNSW<Space>::SelectNeighbours(QueueLess& candidates,
         }
         bool good = true;
         for (IntType neighbour : selected) {
-            FloatType cur_distance = space_.Distance(data_[element], data_[neighbour]);
+            FloatType cur_distance =
+                space_.Distance(&(data_long_[element * SIZE]), &(data_long_[neighbour * SIZE]));
             if (cur_distance < distance) {
                 good = false;
             }
@@ -255,54 +265,54 @@ inline std::vector<IntType> HNSW<Space>::SelectNeighbours(QueueLess& candidates,
     return selected;
 }
 
-template <typename Space>
-inline std::vector<IntType> HNSW<Space>::SSG(IntType node, std::vector<IntType>& candidates,
-                                             IntType M) {
+// template <typename Space>
+// inline std::vector<IntType> HNSW<Space>::SSG(IntType node, std::vector<IntType>& candidates,
+//                                              IntType M) {
 
-    std::sort(candidates.begin(), candidates.end());
-    int new_size = std::unique(candidates.begin(), candidates.end()) - candidates.begin();
-    candidates.resize(new_size);
+//     std::sort(candidates.begin(), candidates.end());
+//     int new_size = std::unique(candidates.begin(), candidates.end()) - candidates.begin();
+//     candidates.resize(new_size);
 
-    QueueLess q;
-    for (IntType neighbour : candidates) {
-        q.emplace(space_.Distance(data_[node], data_[neighbour]), neighbour);
-    }
+//     QueueLess q;
+//     for (IntType neighbour : candidates) {
+//         q.emplace(space_.Distance(data_[node], data_[neighbour]), neighbour);
+//     }
 
-    std::vector<std::pair<FloatType, IntType>> queue;
-    queue.reserve(q.size());
-    while (!q.empty()) {
-        queue.push_back(q.top());
-        q.pop();
-    }
-    std::reverse(queue.begin(), queue.end());
-    std::vector<IntType> selected;
-    std::vector<Point> dir;
-    dir.reserve(M);
-    selected.reserve(M + 1);
-    for (auto& [distance, element] : queue) {
-        if (selected.size() >= M) {
-            break;
-        }
-        if (element == node)
-            continue;
-        Point curdir = data_[element] - data_[node];
-        curdir.Normalize();
-        bool good = true;
-        for (IntType i = 0; i < selected.size(); ++i) {
-            IntType neighbour = selected[i];
-            FloatType cos = space_.Cos(dir[i], curdir);
-            if (cos > ssg_cos) {
-                good = false;
-                break;
-            }
-        }
-        if (good) {
-            selected.push_back(element);
-            dir.push_back(curdir);
-        }
-    }
-    return selected;
-}
+//     std::vector<std::pair<FloatType, IntType>> queue;
+//     queue.reserve(q.size());
+//     while (!q.empty()) {
+//         queue.push_back(q.top());
+//         q.pop();
+//     }
+//     std::reverse(queue.begin(), queue.end());
+//     std::vector<IntType> selected;
+//     std::vector<Point> dir;
+//     dir.reserve(M);
+//     selected.reserve(M + 1);
+//     for (auto& [distance, element] : queue) {
+//         if (selected.size() >= M) {
+//             break;
+//         }
+//         if (element == node)
+//             continue;
+//         Point curdir = data_[element] - data_[node];
+//         curdir.Normalize();
+//         bool good = true;
+//         for (IntType i = 0; i < selected.size(); ++i) {
+//             IntType neighbour = selected[i];
+//             FloatType cos = space_.Cos(dir[i], curdir);
+//             if (cos > ssg_cos) {
+//                 good = false;
+//                 break;
+//             }
+//         }
+//         if (good) {
+//             selected.push_back(element);
+//             dir.push_back(curdir);
+//         }
+//     }
+//     return selected;
+// }
 
 // template <typename Space>
 // inline void HNSW<Space>::MemoryManager(IntType upper_threshold) {
@@ -447,23 +457,23 @@ inline std::vector<IntType> HNSW<Space>::SSG(IntType node, std::vector<IntType>&
 
 template <typename Space>
 inline void HNSW<Space>::TreeReOrdering() {
-    std::vector<FloatType> means1(data_[0].Size());
+    std::vector<FloatType> means1(SIZE);
     for (int i = 0; i < size_; ++i) {
         for (int j = 0; j < means1.size(); ++j) {
-            means1[j] += data_[i][j];
+            means1[j] += data_long_[i * SIZE + j];
         }
     }
     for (int j = 0; j < means1.size(); ++j) {
         means1[j] /= size_;
     }
-    Point meansOne(means1.size());
-    for (int i = 0; i < means1.size(); ++i) {
-        meansOne[i] = means1[i];
-    }
+    // Point meansOne(means1.size());
+    // for (int i = 0; i < means1.size(); ++i) {
+    //     meansOne[i] = means1[i];
+    // }
     FloatType best_dist = 1e9, best_i = -1;
     for (int i = 0; i < size_; ++i) {
-        if (space_.Distance(data_[i], meansOne) < best_dist) {
-            best_dist = space_.Distance(data_[i], meansOne);
+        if (space_.Distance(&(data_long_[i * SIZE]), &(means1[0])) < best_dist) {
+            best_dist = space_.Distance(&(data_long_[i * SIZE]), &(means1[0]));
             best_i = i;
         }
     }
@@ -512,11 +522,17 @@ inline void HNSW<Space>::GraphReWrite() {
     }
     graph_ = graph_new_;
     enter_point_ = reorder_to_new_[enter_point_];
-    std::vector<Point> data_new_(size_, Point(data_[0].Size()));
+    // std::vector<Point> data_new_(size_, Point(data_[0].Size()));
+    std::vector<FloatType> data_new(SIZE * size_);
     for (int i = 0; i < size_; ++i) {
-        data_new_[i] = data_[reorder_to_old_[i]];
+        for (int j = 0; j < SIZE; ++j) {
+            data_new[i * SIZE + j] = data_long_[reorder_to_old_[i] * SIZE + j];
+        }
     }
-    data_ = data_new_;
+    for (int i = 0; i < SIZE * size_; ++i) {
+        data_long_[i] = data_new[i];
+    }
+    // data_ = data_new_;
 }
 
 #define SUM_ABS
@@ -607,7 +623,7 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
     std::cout << sum << "\n";
     std::cout << "START\n";
     std::mt19937 gen(0);
-    std::uniform_int_distribution<long long> dist(0, size_-1);
+    std::uniform_int_distribution<long long> dist(0, size_ - 1);
     for (int _ = 0; _ < 50; _++) {
         std::cout << _ << "\n";
         for (int i = 0; i < size_; ++i) {
@@ -616,7 +632,7 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
             }
             // for (int j = reorder_to_new_[i] + 1; (j <= reorder_to_new_[i] + 30) and (j < size_);
             //      ++j) {
-            for (int _=0; _<30; ++_){
+            for (int _ = 0; _ < 30; ++_) {
                 // for (int jj = 2; jj <= 61; ++jj) {
                 //     int sign = 1;
                 //     if (jj % 2)
@@ -627,7 +643,7 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
                 // if (i == j) {
                 //     continue;
                 // }
-                int j=dist(gen);
+                int j = dist(gen);
                 int64_t l = reorder_to_old_[j];
                 int64_t mn_score = 0, index = -1;
                 for (int ne : graph_[i].neighbors_[0]) {
@@ -667,7 +683,7 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
             }
             for (int j = reorder_to_new_[i] + 1; (j <= reorder_to_new_[i] + 30) and (j < size_);
                  ++j) {
-            // for (int _=0; _<30; ++_){
+                // for (int _=0; _<30; ++_){
                 // for (int jj = 2; jj <= 61; ++jj) {
                 //     int sign = 1;
                 //     if (jj % 2)
@@ -818,8 +834,8 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
 template <typename Space>
 inline void HNSW<Space>::ReOrdering() {
     // SumOfAbs();
-    SumOfModulesReOrdering();
-    // TreeReOrdering();
+    // SumOfModulesReOrdering();
+    TreeReOrdering();
     GraphReWrite();
 }
 
@@ -848,7 +864,7 @@ inline void HNSW<Space>::DfsReorder(IntType cur) {
 }
 
 template <typename Space>
-inline std::vector<IntType> HNSW<Space>::Search(Point& query, IntType K, IntType ef) {
+inline std::vector<IntType> HNSW<Space>::Search(FloatType* query, IntType K, IntType ef) {
     IntType enter_point = enter_point_;
     for (IntType i = max_level_; i >= 1; --i) {
         enter_point = SearchLayer(query, enter_point, 1, i).top().second;
@@ -918,12 +934,12 @@ inline void HNSW<Space>::Save(std::ofstream& file, IntType precision) {
     file << M_ << "\n";
     file << ef_construction_ << "\n";
     file << max_level_ << "\n";
-    IntType dim = data_[0].Size();
+    IntType dim = SIZE;
     file << dim << "\n";
     file << std::fixed << std::setprecision(precision);
     for (IntType node = 0; node < size_; ++node) {
         for (IntType i = 0; i < dim; ++i) {
-            file << data_[node][i] << " ";
+            file << data_long_[node * SIZE + i] << " ";
         }
         file << "\n";
     }
@@ -967,10 +983,15 @@ inline HNSW<Space>::HNSW(std::ifstream& file) {
     file >> max_level_;
     IntType dim;
     file >> dim;
-    data_ = std::vector<Point>(size_, Point(dim));
+    // data_ = std::vector<Point>(size_, Point(dim));
+    // data_long_ = std::vector<FloatType>(size_ * SIZE);
+    data_long_ = static_cast<float*>(aligned_alloc(64, (size_ * SIZE) * sizeof(float)));
     for (IntType node = 0; node < size_; ++node) {
         for (IntType i = 0; i < dim; ++i) {
-            file >> data_[node][i];
+            FloatType x;
+            file >> x;
+            data_long_[node * SIZE + i] = x;
+            // data_[node][i] = x;
         }
     }
     for (IntType node = 0; node < size_; ++node) {
@@ -990,7 +1011,8 @@ inline HNSW<Space>::HNSW(std::ifstream& file) {
                 file >> neighbour;
                 graph_[node].neighbors_[level].push_back(neighbour);
             }
-            // std::sort(graph_[node].neighbors_[level].begin(), graph_[node].neighbors_[level].end());
+            // std::sort(graph_[node].neighbors_[level].begin(),
+            // graph_[node].neighbors_[level].end());
         }
     }
     IntType reorder_old_size;
