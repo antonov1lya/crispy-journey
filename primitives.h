@@ -6,7 +6,7 @@
 typedef float FloatType;
 typedef int IntType;
 
-#define SIZE 784
+#define SIZE 128
 
 // struct Point {
 //     explicit Point(IntType n) {
