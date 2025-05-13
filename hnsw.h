@@ -13,7 +13,7 @@
 
 // #define MEMORY_OPTIMIZATION
 // #define LONG_VECTOR
-// #define REORDER
+#define REORDER
 // #define THRESHOLD 100000
 
 typedef std::priority_queue<std::pair<FloatType, IntType>,
@@ -538,10 +538,13 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
             graph_inv_[j].push_back(i);
         }
     }
-
+    // int l_score = 10;
+    // int k_score = size;
+    // std::cout << k_score << "\n";
 #ifdef SUM_ABS
     // sum of abs
     auto ScoreF = [=](int x, int y) {
+        // return ((reorder_to_new_[x]/k_score) != (reorder_to_new_[y]/k_score));
         return abs(reorder_to_new_[x] - reorder_to_new_[y]);
         // return (abs(reorder_to_new_[x] - reorder_to_new_[y]) > THRESHOLD) *
         //        abs(reorder_to_new_[x] - reorder_to_new_[y]);
@@ -603,25 +606,79 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
     }
     std::cout << sum << "\n";
     std::cout << "START\n";
-    for (int _ = 0; _ < 100; _++) {
+    std::mt19937 gen(0);
+    std::uniform_int_distribution<long long> dist(0, size_-1);
+    for (int _ = 0; _ < 50; _++) {
         std::cout << _ << "\n";
-
         for (int i = 0; i < size_; ++i) {
             if (i % 10000 == 0) {
                 std::cout << i << "\n";
             }
             // for (int j = reorder_to_new_[i] + 1; (j <= reorder_to_new_[i] + 30) and (j < size_);
             //      ++j) {
-            for (int jj = 2; jj <= 61; ++jj) {
-                int sign = 1;
-                if (jj % 2)
-                    sign = -1;
-                int j = reorder_to_new_[i] + sign * (jj / 2);
-                if (!(0 <= j and j < size_))
-                    continue;
+            for (int _=0; _<30; ++_){
+                // for (int jj = 2; jj <= 61; ++jj) {
+                //     int sign = 1;
+                //     if (jj % 2)
+                //         sign = -1;
+                //     int j = reorder_to_new_[i] + sign * (jj / 2);
+                //     if (!(0 <= j and j < size_))
+                //         continue;
                 // if (i == j) {
                 //     continue;
                 // }
+                int j=dist(gen);
+                int64_t l = reorder_to_old_[j];
+                int64_t mn_score = 0, index = -1;
+                for (int ne : graph_[i].neighbors_[0]) {
+                    int64_t score_old = GetScore(l, ne);
+                    std::swap(reorder_to_new_[l], reorder_to_new_[ne]);
+                    int64_t score_new = GetScore(l, ne);
+                    if (score_new - score_old < mn_score) {
+                        mn_score = score_new - score_old;
+                        index = ne;
+                    }
+                    std::swap(reorder_to_new_[l], reorder_to_new_[ne]);
+                }
+                if (mn_score < 0) {
+                    std::swap(reorder_to_new_[l], reorder_to_new_[index]);
+                    std::swap(reorder_to_old_[reorder_to_new_[l]],
+                              reorder_to_old_[reorder_to_new_[index]]);
+                }
+            }
+        }
+        sum = 0;
+        for (int ii = 0; ii < size_; ++ii) {
+            for (int jj : graph_[ii].neighbors_[0]) {
+#ifdef SUM_ABS
+                sum += ScoreF(ii, jj);
+#else
+                sum += ScoreF(ii);
+#endif
+            }
+        }
+        std::cout << sum << "\n";
+    }
+    for (int _ = 0; _ < 20; _++) {
+        std::cout << _ << "\n";
+        for (int i = 0; i < size_; ++i) {
+            if (i % 10000 == 0) {
+                std::cout << i << "\n";
+            }
+            for (int j = reorder_to_new_[i] + 1; (j <= reorder_to_new_[i] + 30) and (j < size_);
+                 ++j) {
+            // for (int _=0; _<30; ++_){
+                // for (int jj = 2; jj <= 61; ++jj) {
+                //     int sign = 1;
+                //     if (jj % 2)
+                //         sign = -1;
+                //     int j = reorder_to_new_[i] + sign * (jj / 2);
+                //     if (!(0 <= j and j < size_))
+                //         continue;
+                // if (i == j) {
+                //     continue;
+                // }
+                // int j=dist(gen);
                 int64_t l = reorder_to_old_[j];
                 int64_t mn_score = 0, index = -1;
                 for (int ne : graph_[i].neighbors_[0]) {
@@ -933,6 +990,7 @@ inline HNSW<Space>::HNSW(std::ifstream& file) {
                 file >> neighbour;
                 graph_[node].neighbors_[level].push_back(neighbour);
             }
+            // std::sort(graph_[node].neighbors_[level].begin(), graph_[node].neighbors_[level].end());
         }
     }
     IntType reorder_old_size;

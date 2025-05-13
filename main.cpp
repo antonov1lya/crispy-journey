@@ -8,15 +8,16 @@
 #include "hnsw.h"
 #include "primitives.h"
 
-#define SPACE SpaceCosine
+// #define SPACE SpaceCosine
+#define SPACE SpaceL2
 
 std::mt19937 gen(0);
 
 std::uniform_real_distribution<FloatType> dist(0, 1);
 
 void evaluate(std::ofstream& out, HNSW<SPACE>& hnsw, size_t ef, int k = 10) {
-    std::ifstream query("datasets/glove/query.txt");
-    std::ifstream groundtruth("datasets/glove/groundtruth.txt");
+    std::ifstream query("datasets/fashion_mnist/query.txt");
+    std::ifstream groundtruth("datasets/fashion_mnist/groundtruth.txt");
 
     int n = 10000;
     double result = 0;
@@ -27,7 +28,7 @@ void evaluate(std::ofstream& out, HNSW<SPACE>& hnsw, size_t ef, int k = 10) {
         for (int j = 0; j < SIZE; ++j) {
             query >> v[j];
         }
-        v.Normalize();
+        // v.Normalize();
         auto res = hnsw.Search(v, k, ef);
         std::vector<size_t> w(100);
         for (int j = 0; j < 100; ++j) {
@@ -53,7 +54,11 @@ void evaluate(std::ofstream& out, HNSW<SPACE>& hnsw, size_t ef, int k = 10) {
     groundtruth.close();
 }
 
-void PrintGraph(HNSW<SPACE>& hnsw) {
+void PrintGraph() {
+    std::ifstream in("sift_random.txt");
+    HNSW<SPACE> hnsw(in);
+    in.close();
+
     std::ofstream print("output.txt");
     for (int i = 0; i < hnsw.size_; ++i) {
         for (int j : hnsw.graph_[i].neighbors_[0]) {
@@ -63,45 +68,46 @@ void PrintGraph(HNSW<SPACE>& hnsw) {
 }
 
 void Benchmark() {
-    std::ifstream in("indexes/glove.txt");
+    std::ifstream in("fmnist_tree.txt");
     HNSW<SPACE> hnsw(in);
     in.close();
 
     std::cout << "WARMUP\n";
-    std::ofstream trash("bench/trash.txt");
+    std::ofstream trash("bench/points_old.txt");
     for (int i = 10; i < 101; i += 10) {
         evaluate(trash, hnsw, i, 10);
     }
     trash.close();
 
-    std::cout << "START\n";
-    std::ofstream print("bench/test_glove.txt");
-    {
-        for (int j = 0; j < 5; j++)
-            for (int i = 10; i < 201; i += 10) {
-                std::cout << i << " " << j << "\n";
-                evaluate(print, hnsw, i, 10);
-            }
-        print << "NEXT\n";
-    }
+    // std::cout << "START\n";
+    // std::ofstream print("bench/fashion_mnist/random2.txt");
+    // {
+    //     for (int j = 0; j < 5; j++)
+    //         for (int i = 10; i < 201; i += 10) {
+    //             std::cout << i << " " << j << "\n";
+    //             evaluate(print, hnsw, i, 10);
+    //         }
+    //     print << "NEXT\n";
+    // }
 }
 
 void Reorder() {
-    std::ifstream in("indexes/glove.txt");
+    std::ifstream in("indexes/sift.txt");
     HNSW<SPACE> hnsw(in);
     in.close();
 
     hnsw.ReOrdering();
 
-    std::ofstream out("reordered_glove_lc_new.txt");
+    std::ofstream out("sift_random.txt");
     hnsw.Save(out);
     out.close();
 }
 
 void Create() {
-    std::ifstream in("datasets/glove/data.txt");
+    std::ifstream in("datasets/fashion-mnist/data.txt");
     // size_t M = 25, efConstruction = 600, n = 1000000;
-    size_t M = 25, efConstruction = 2500, n = 1183514;
+    // size_t M = 25, efConstruction = 2500, n = 1183514;
+    size_t M = 25, efConstruction = 600, n = 60000;
     FloatType el = 1.0 / std::log(1.0 * M);
     HNSW<SPACE> hnsw(M, efConstruction, n);
     for (int i = 0; i < n; ++i) {
@@ -112,11 +118,35 @@ void Create() {
         for (int j = 0; j < SIZE; ++j) {
             in >> point[j];
         }
-        point.Normalize();
+        // point.Normalize();
         int level = static_cast<int>(-std::log(dist(gen)) * el);
         hnsw.Add(point, level);
     }
-    std::ofstream out("indexes/glove.txt");
+    std::ofstream out("indexes/fashion_mnist_classic.txt");
+    hnsw.Save(out);
+    out.close();
+}
+
+void ReSave(){
+    std::ifstream in("glove_heuristic.txt");
+    HNSW<SPACE> hnsw(in);
+
+    size_t M = 25, efConstruction = 2500, n = 1183514;
+    
+    std::vector<int>reorder_to_new_(n);
+    for(int i=0; i<n; i++){
+        reorder_to_new_[hnsw.reorder_to_old_[i]]=i;
+    }
+
+    std::ifstream dt("datasets/glove/data.txt");
+    for(int i=0; i<n; i++){
+        for(int j=0; j<SIZE; j++){
+            dt >> hnsw.data_[reorder_to_new_[i]][j];
+        }
+        hnsw.data_[reorder_to_new_[i]].Normalize();
+    }
+
+    std::ofstream out("glove_heuristic_pres6.txt");
     hnsw.Save(out);
     out.close();
 }
@@ -125,6 +155,8 @@ int main() {
     // Create();
     Benchmark();
     // Reorder();
+    // ReSave();
+    // PrintGraph();
 
     return 0;
 }
