@@ -6,52 +6,10 @@
 typedef float FloatType;
 typedef int IntType;
 
-#define SIZE 128
-
-// struct Point {
-//     explicit Point(IntType n) {
-//         data_.resize(n);
-//     }
-//     IntType Size() const {
-//         return SIZE;
-//     }
-//     FloatType& operator[](IntType i) {
-//         return data_[i];
-//     }
-//     FloatType operator[](IntType i) const {
-//         return data_[i];
-//     }
-//     void Normalize() {
-//         FloatType norm = 0;
-//         for (IntType i = 0; i < SIZE; ++i) {
-//             norm += data_[i] * data_[i];
-//         }
-//         norm = sqrt(norm);
-//         for (IntType i = 0; i < SIZE; ++i) {
-//             data_[i] /= norm;
-//         }
-//     }
-//     std::vector<FloatType> data_;
-// };
-
-// Point operator-(Point& a, Point& b) {
-//     Point result(SIZE);
-//     for (IntType i = 0; i < SIZE; ++i) {
-//         result[i] = a[i] - b[i];
-//     }
-//     return result;
-// }
+// #define SIZE 960
+#define SIZE 784
 
 struct SpaceL2 {
-    // FloatType Distance(const struct Point& x, const struct Point& y) {
-    //     ++computations_;
-    //     FloatType distance = 0;
-    //     for (IntType i = 0; i < SIZE; ++i) {
-    //         FloatType diff = x[i] - y[i];
-    //         distance += diff * diff;
-    //     }
-    //     return distance;
-    // }
     FloatType Distance(FloatType* x, FloatType* y) {
         ++computations_;
         FloatType distance = 0;
@@ -61,43 +19,29 @@ struct SpaceL2 {
         }
         return distance;
     }
-    // FloatType Cos(const struct Point& x, const struct Point& y) {
-    //     FloatType result = 0;
-    //     for (IntType i = 0; i < SIZE; ++i) {
-    //         result += x[i] * y[i];
-    //     }
-    //     return result;
-    // }
     IntType GetComputationsNumber() {
         return computations_;
     }
     void FlushComputationsNumber() {
         computations_ = 0;
     }
-    size_t computations_ = 0;
+    IntType computations_ = 0;
 };
 
 struct SpaceCosine {
-    // FloatType Distance(const struct Point& x, const struct Point& y) {
-    //     ++computations_;
-    //     FloatType result = 0;
-    //     for (IntType i = 0; i < SIZE; ++i) {
-    //         result += x[i] * y[i];
-    //     }
-    //     return 1 - result;
-    // }
-    // FloatType Cos(const struct Point& x, const struct Point& y) {
-    //     FloatType result = 0;
-    //     for (IntType i = 0; i < SIZE; ++i) {
-    //         result += x[i] * y[i];
-    //     }
-    //     return result;
-    // }
+    FloatType Distance(FloatType* x, FloatType* y) {
+        ++computations_;
+        FloatType distance = 0;
+        for (IntType i = 0; i < SIZE; ++i) {
+            distance += x[i] * y[i];
+        }
+        return distance;
+    }
     IntType GetComputationsNumber() {
         return computations_;
     }
     void FlushComputationsNumber() {
         computations_ = 0;
     }
-    size_t computations_ = 0;
+    IntType computations_ = 0;
 };

@@ -11,6 +11,8 @@
 // #define SPACE SpaceCosine
 #define SPACE SpaceL2
 
+std::string dataset_name = "fashion_mnist";
+
 std::mt19937 gen(0);
 
 std::uniform_real_distribution<FloatType> dist(0, 1);
@@ -19,8 +21,9 @@ std::vector<std::vector<FloatType>> query_data;
 std::vector<std::set<size_t>> groundtruth_data;
 
 void ReadData() {
-    std::ifstream query("datasets/sift/query.txt");
-    std::ifstream groundtruth("datasets/sift/groundtruth.txt");
+    std::ifstream query(std::string("datasets/") + dataset_name + std::string("/query.txt"));
+    std::ifstream groundtruth(std::string("datasets/") + dataset_name +
+                              std::string("/groundtruth.txt"));
     int n = 10000;
     int k = 10;
     query_data = std::vector<std::vector<FloatType>>(n, std::vector<FloatType>(SIZE));
@@ -65,15 +68,19 @@ void evaluate(std::ofstream& out, HNSW<SPACE>& hnsw, size_t ef, int k = 10) {
 }
 
 void Benchmark() {
-    std::ifstream in("sift_tree.txt");
-    HNSW<SPACE> hnsw(in);
+    // std::ifstream in("indexes/fashion_mnist.txt");
+    std::ifstream in("reordered/sift_tree.txt");
+    std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.txt"));
+    HNSW<SPACE> hnsw(in, in_data);
     in.close();
+    in_data.close();
 
     ReadData();
 
     std::cout << "WARMUP\n";
     std::ofstream trash("bench/trash1.txt");
-    for (int i = 10; i < 201; i += 10) {
+    for (int i = 10; i < 101; i += 10) {
+        std::cout << i << "\n";
         evaluate(trash, hnsw, i, 10);
     }
     trash.close();
@@ -90,56 +97,73 @@ void Benchmark() {
     // }
 }
 
-void PrintGraph() {
-    std::ifstream in("sift_random.txt");
-    HNSW<SPACE> hnsw(in);
-    in.close();
+// void PrintGraph() {
+//     std::ifstream in("sift_reorder/lc_100k.txt");
+//     HNSW<SPACE> hnsw(in);
+//     in.close();
 
-    std::ofstream print("output.txt");
-    for (int i = 0; i < hnsw.size_; ++i) {
-        for (int j : hnsw.graph_[i].neighbors_[0]) {
-            print << i << " " << j << "\n";
-        }
-    }
-}
+//     std::ofstream print("output.txt");
+//     for (int i = 0; i < hnsw.size_; ++i) {
+//         for (int j : hnsw.graph_[i].neighbors_[0]) {
+//             print << i << " " << j << "\n";
+//         }
+//     }
+// }
 
 void Reorder() {
-    std::ifstream in("indexes/sift.txt");
-    HNSW<SPACE> hnsw(in);
+    std::ifstream in("indexes/fashion_mnist.txt");
+    std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.txt"));
+    HNSW<SPACE> hnsw(in, in_data);
     in.close();
 
     hnsw.ReOrdering();
 
-    std::ofstream out("sift_tree.txt");
+    std::ofstream out("reordered/sift_tree.txt");
     hnsw.Save(out);
     out.close();
 }
 
 void Create() {
-    std::ifstream in("datasets/fashion_mnist/data.txt");
-    // size_t M = 25, efConstruction = 600, n = 1000000;
-    // size_t M = 25, efConstruction = 2500, n = 1183514;
-    size_t M = 25, efConstruction = 600, n = 60000;
+    std::ifstream in(std::string("datasets/") + dataset_name + std::string("/data.txt"));
+    size_t M, efConstruction, n;
+    if (dataset_name == "fashion_mnist") {
+        M = 25;
+        efConstruction = 600;
+        n = 60000;
+    }
+    if (dataset_name == "sift") {
+        M = 25;
+        efConstruction = 600;
+        n = 1000000;
+    }
+    if (dataset_name == "glove") {
+        M = 25;
+        efConstruction = 2500;
+        n = 1183514;
+    }
+    if (dataset_name == "gist") {
+        M = 35;
+        efConstruction = 800;
+        n = 1000000;
+    }
     FloatType el = 1.0 / std::log(1.0 * M);
-    HNSW<SPACE> hnsw(M, efConstruction, n);
+    HNSW<SPACE> hnsw(M, efConstruction, n, in);
+    in.close();
     for (int i = 0; i < n; ++i) {
         if (i % 1000 == 0) {
             std::cout << i << "\n";
         }
-        for (int j = 0; j < SIZE; ++j) {
-            in >> hnsw.data_long_[i * SIZE + j];
-        }
         int level = static_cast<int>(-std::log(dist(gen)) * el);
         hnsw.Add(level);
     }
-    std::ofstream out("trash.txt");
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string(".txt"));
     hnsw.Save(out);
     out.close();
 }
 
 int main() {
     // Create();
-    Benchmark();
+    // Benchmark();
     // Reorder();
     // PrintGraph();
 
