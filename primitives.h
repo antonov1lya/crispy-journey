@@ -6,8 +6,10 @@
 typedef float FloatType;
 typedef int IntType;
 
+#define SIZE 128
 // #define SIZE 960
-#define SIZE 784
+// #define SIZE 784
+// #define SIZE 100
 
 struct SpaceL2 {
     FloatType Distance(FloatType* x, FloatType* y) {
@@ -35,7 +37,7 @@ struct SpaceCosine {
         for (IntType i = 0; i < SIZE; ++i) {
             distance += x[i] * y[i];
         }
-        return distance;
+        return 1 - distance;
     }
     IntType GetComputationsNumber() {
         return computations_;
@@ -45,3 +47,14 @@ struct SpaceCosine {
     }
     IntType computations_ = 0;
 };
+
+void Normalize(FloatType* x) {
+    FloatType norm = 0;
+    for (IntType i = 0; i < SIZE; ++i) {
+        norm += x[i] * x[i];
+    }
+    norm = std::sqrt(norm);
+    for (IntType i = 0; i < SIZE; ++i) {
+        x[i] /= norm;
+    }
+}

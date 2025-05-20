@@ -151,7 +151,10 @@ inline QueueLess HNSW<Space>::SearchLayer(FloatType* query, IntType enter_point,
             nearest_neighbours.size() == ef) {
             break;
         }
-        for (IntType next : graph_[current].neighbors_[level]) {
+        const IntType cursz = graph_[current].neighbors_[level].size();
+        for(int i=0; i<cursz; ++i){
+            IntType next = graph_[current].neighbors_[level][i];
+        // for (IntType next : graph_[current].neighbors_[level]) {
             if (was_[next] != current_was_) {
                 was_[next] = current_was_;
                 furthest_distance = nearest_neighbours.top().first;
@@ -172,18 +175,18 @@ inline QueueLess HNSW<Space>::SearchLayer(FloatType* query, IntType enter_point,
 template <typename Space>
 inline std::vector<IntType> HNSW<Space>::SelectNeighbours(QueueLess& candidates, IntType M,
                                                           IntType maxM) {
-    bool simple = true;
-    if (simple) {
-        std::vector<IntType> array;
-        array.reserve(maxM + 1);
-        while (!candidates.empty()) {
-            array.push_back(candidates.top().second);
-            candidates.pop();
-        }
-        std::reverse(array.begin(), array.end());
-        array.resize(std::min(M, static_cast<IntType>(array.size())));
-        return array;
-    }
+    // bool simple = false;
+    // if (simple) {
+    //     std::vector<IntType> array;
+    //     array.reserve(maxM + 1);
+    //     while (!candidates.empty()) {
+    //         array.push_back(candidates.top().second);
+    //         candidates.pop();
+    //     }
+    //     std::reverse(array.begin(), array.end());
+    //     array.resize(std::min(M, static_cast<IntType>(array.size())));
+    //     return array;
+    // }
     if (candidates.size() < M) {
         std::vector<IntType> array;
         array.reserve(maxM + 1);
@@ -371,7 +374,7 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
     }
     std::cout << sum << "\n";
     std::cout << "START\n";
-    for (int _ = 0; _ < 10; _++) {
+    for (int _ = 0; _ < 100; _++) {
         std::cout << _ << "\n";
         for (int i = 0; i < size_; ++i) {
             if (i % 10000 == 0) {
