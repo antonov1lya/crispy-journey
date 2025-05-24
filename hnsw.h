@@ -13,16 +13,6 @@
 
 #define REORDER
 
-typedef std::priority_queue<std::pair<FloatType, IntType>,
-                            std::vector<std::pair<FloatType, IntType>>,
-                            std::less<std::pair<FloatType, IntType>>>
-    QueueLess;
-
-typedef std::priority_queue<std::pair<FloatType, IntType>,
-                            std::vector<std::pair<FloatType, IntType>>,
-                            std::greater<std::pair<FloatType, IntType>>>
-    QueueGreater;
-
 struct Node {
     Node(IntType max_level) {
         neighbors_.resize(max_level + 1);
@@ -154,7 +144,6 @@ inline QueueLess HNSW<Space>::SearchLayer(FloatType* query, IntType enter_point,
         const IntType cursz = graph_[current].neighbors_[level].size();
         for(int i=0; i<cursz; ++i){
             IntType next = graph_[current].neighbors_[level][i];
-        // for (IntType next : graph_[current].neighbors_[level]) {
             if (was_[next] != current_was_) {
                 was_[next] = current_was_;
                 furthest_distance = nearest_neighbours.top().first;

@@ -2,9 +2,20 @@
 
 #include <cmath>
 #include <vector>
+#include <queue>
 
 typedef float FloatType;
 typedef int IntType;
+
+typedef std::priority_queue<std::pair<FloatType, IntType>,
+                            std::vector<std::pair<FloatType, IntType>>,
+                            std::less<std::pair<FloatType, IntType>>>
+    QueueLess;
+
+typedef std::priority_queue<std::pair<FloatType, IntType>,
+                            std::vector<std::pair<FloatType, IntType>>,
+                            std::greater<std::pair<FloatType, IntType>>>
+    QueueGreater;
 
 #define SIZE 128
 // #define SIZE 960

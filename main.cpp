@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "hnsw.h"
+#include "hnsw_inference.h"
 #include "primitives.h"
 
 // #define SPACE SpaceCosine
@@ -61,7 +62,8 @@ void ReadData() {
     groundtruth.close();
 }
 
-void evaluate(std::ofstream& out, HNSW<SPACE>& hnsw, size_t ef, int k = 10) {
+
+void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef, int k = 10) {
     int n = 10000;
     if (dataset_name == "gist") {
         n = 1000;
@@ -97,7 +99,7 @@ void Benchmark() {
     // std::ifstream in("reordered/gist_lc50.txt");
     // std::ifstream in("reordered/glove.txt");
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.txt"));
-    HNSW<SPACE> hnsw(in, in_data);
+    HNSWInference<SPACE> hnsw(in, in_data);
     in.close();
     in_data.close();
 
