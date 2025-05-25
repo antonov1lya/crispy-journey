@@ -62,7 +62,6 @@ void ReadData() {
     groundtruth.close();
 }
 
-
 void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef, int k = 10) {
     int n = 10000;
     if (dataset_name == "gist") {
@@ -101,23 +100,19 @@ void Benchmark() {
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.txt"));
     HNSWInference<SPACE> hnsw(in, in_data);
 
-    if(dataset_name=="glove"){
-        // std::cout << "hi\n";
-        for(int i=0; i<1183514; ++i){
-            FloatType* pointer = (FloatType*) (hnsw.data + i*hnsw.struct_size + hnsw.struct_shift);
-            Normalize(pointer);
+    if (dataset_name == "glove") {
+        for (int i = 0; i < 1183514; ++i) {
+            Normalize(hnsw.data + i * SIZE);
         }
-        // NormalizeGlove(&(hnsw.data_long_[0]));
     }
-
     in.close();
     in_data.close();
 
     ReadData();
 
     std::cout << "WARMUP\n";
-    std::ofstream trash("v4.txt");
-    for (int i = 1000; i < 1001; i += 10) {
+    std::ofstream trash("v3.txt");
+    for (int i = 1000; i < 1001; i += 1) {
         std::cout << i << "\n";
         evaluate(trash, hnsw, i, 10);
     }
