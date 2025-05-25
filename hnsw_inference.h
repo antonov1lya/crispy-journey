@@ -27,13 +27,9 @@ struct HNSWInference {
 
     Space space_;
 
-    IntType struct_size;
-    IntType struct_shift;
-
-    IntType list_size;
-
-    char* data;
-    char** list;
+    FloatType* data;
+    IntType* list0;
+    IntType** list;
     IntType* was_;
 };
 
@@ -43,7 +39,7 @@ inline QueueLess HNSWInference<Space>::SearchLayer(FloatType* query, IntType ent
     was_[enter_point] = ++current_was_;
     QueueGreater candidates;
 
-    FloatType* ep_pointer = (FloatType*)(data + struct_size * enter_point + struct_shift);
+    FloatType* ep_pointer = data + SIZE * enter_point;
     FloatType enter_point_distance = space_.Distance(ep_pointer, query);
 
     candidates.emplace(enter_point_distance, enter_point);
@@ -63,27 +59,27 @@ inline QueueLess HNSWInference<Space>::SearchLayer(FloatType* query, IntType ent
 
         IntType* pointer;
         if (level == 0) {
-            pointer = (IntType*)(data + struct_size * current);
+            pointer = list0 + (maxM0_ + 1) * current;
         } else {
-            pointer = (IntType*)(list[current] + (level - 1) * list_size);
+            pointer = list[current] + (level - 1) * (maxM_ + 1);
         }
 
         IntType cursz = pointer[0];
 
         _mm_prefetch((char*)(was_ + *(pointer + 1)), _MM_HINT_T0);
-        _mm_prefetch(data + (*(pointer + 1)) * struct_size + struct_shift, _MM_HINT_T0);
+        _mm_prefetch((char*)(data + (*(pointer + 1)) * SIZE), _MM_HINT_T0);
 
         for (IntType i = 1; i <= cursz; ++i) {
             IntType next = pointer[i];
 
             _mm_prefetch((char*)(was_ + *(pointer + i + 1)), _MM_HINT_T0);
-            _mm_prefetch(data + (*(pointer + i + 1)) * struct_size + struct_shift, _MM_HINT_T0);
+            _mm_prefetch((char*)(data + (*(pointer + i + 1)) * SIZE), _MM_HINT_T0);
 
             if (was_[next] != current_was_) {
                 was_[next] = current_was_;
                 furthest_distance = nearest_neighbours.top().first;
 
-                FloatType* ne_pointer = (FloatType*)(data + struct_size * next + struct_shift);
+                FloatType* ne_pointer = data + SIZE * next;
                 FloatType distance = space_.Distance(ne_pointer, query);
 
                 if (distance < furthest_distance or nearest_neighbours.size() < ef) {
@@ -141,21 +137,19 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
     IntType dim;
     file >> dim;
 
-    struct_size = (maxM0_ + 1) * sizeof(IntType) + SIZE * sizeof(FloatType);
-    struct_shift = (maxM0_ + 1) * sizeof(IntType);
-    list_size = (maxM_ + 1) * sizeof(IntType);
-
     was_ = (IntType*)aligned_alloc(ALIGN64, size_ * sizeof(IntType));
     memset(was_, 0, size_ * sizeof(int));
 
-    data = (char*)(aligned_alloc(ALIGN64, struct_size * size_));
-    list = (char**)(aligned_alloc(ALIGN64, size_ * sizeof(char*)));
+    data = (FloatType*)(aligned_alloc(ALIGN64, size_ * SIZE * sizeof(FloatType)));
+    list = (IntType**)(aligned_alloc(ALIGN64, size_ * sizeof(IntType*)));
+    list0 = (IntType*)(aligned_alloc(ALIGN64, size_ * (maxM0_ + 1) * sizeof(IntType)));
 
     for (IntType node = 0; node < size_; ++node) {
         IntType level_number;
         file >> level_number;
         if (level_number > 1) {
-            list[node] = static_cast<char*>(aligned_alloc(ALIGN4, (level_number - 1) * list_size));
+            list[node] = (IntType*)(aligned_alloc(
+                ALIGN4, (level_number - 1) * (maxM_ + 1) * sizeof(IntType)));
         }
         for (IntType level = 0; level < level_number; ++level) {
             IntType neighbour_number;
@@ -163,9 +157,9 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
 
             IntType* pointer;
             if (level == 0) {
-                pointer = (IntType*)(data + struct_size * node);
+                pointer = (IntType*)(list0 + (maxM0_ + 1) * node);
             } else {
-                pointer = (IntType*)(list[node] + (level - 1) * list_size);
+                pointer = (IntType*)(list[node] + (level - 1) * (maxM_ + 1));
             }
             pointer[0] = neighbour_number;
 
@@ -192,8 +186,7 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
     }
 
     for (IntType node = 0; node < size_; ++node) {
-        FloatType* pointer =
-            (FloatType*)(data + struct_size * reorder_to_new_[node] + struct_shift);
+        FloatType* pointer = (FloatType*)(data + SIZE * reorder_to_new_[node]);
         for (IntType i = 0; i < dim; ++i) {
             file_data >> pointer[i];
         }
