@@ -4,10 +4,6 @@
 
 #include "primitives.h"
 
-#define REORDER
-#define ALIGN64 64
-#define ALIGN4 4
-
 template <typename Space>
 struct HNSWInference {
     HNSWInference(std::ifstream& file, std::ifstream& file_data);
@@ -130,6 +126,7 @@ inline std::vector<IntType> HNSWInference<Space>::Search(FloatType* query, IntTy
 
 template <typename Space>
 inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& file_data) {
+
     file >> size_;
     max_elements_ = size_;
 
@@ -198,9 +195,7 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
         FloatType* pointer =
             (FloatType*)(data + struct_size * reorder_to_new_[node] + struct_shift);
         for (IntType i = 0; i < dim; ++i) {
-            FloatType x;
-            file_data >> x;
-            pointer[i] = x;
+            file_data >> pointer[i];
         }
     }
 }

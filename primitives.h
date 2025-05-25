@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cmath>
-#include <vector>
 #include <queue>
+#include <vector>
 
 typedef float FloatType;
 typedef int IntType;
@@ -17,10 +17,15 @@ typedef std::priority_queue<std::pair<FloatType, IntType>,
                             std::greater<std::pair<FloatType, IntType>>>
     QueueGreater;
 
-#define SIZE 128
+#define REORDER
+
+#define ALIGN64 64
+#define ALIGN4 4
+
+// #define SIZE 128
 // #define SIZE 960
 // #define SIZE 784
-// #define SIZE 100
+#define SIZE 100
 
 struct SpaceL2 {
     FloatType Distance(FloatType* x, FloatType* y) {

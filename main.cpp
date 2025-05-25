@@ -9,17 +9,17 @@
 #include "hnsw_inference.h"
 #include "primitives.h"
 
-// #define SPACE SpaceCosine
-#define SPACE SpaceL2
+#define SPACE SpaceCosine
+// #define SPACE SpaceL2
 
 // std::string dataset_name = "fashion_mnist";
 // std::string dataset_name = "gist";
-std::string dataset_name = "sift";
-// std::string dataset_name = "glove";
+// std::string dataset_name = "sift";
+std::string dataset_name = "glove";
 
 std::mt19937 gen(0);
 
-std::uniform_real_distribution<FloatType> dist(0, 1);
+std::uniform_real_distribution<float> dist(0, 1);
 
 std::vector<std::vector<FloatType>> query_data;
 std::vector<std::set<size_t>> groundtruth_data;
@@ -43,9 +43,9 @@ void ReadData() {
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < SIZE; ++j) {
             query >> query_data[i][j];
-            if (dataset_name == "glove") {
-                Normalize(&query_data[i][0]);
-            }
+        }
+        if (dataset_name == "glove") {
+            Normalize(&query_data[i][0]);
         }
     }
     groundtruth_data = std::vector<std::set<size_t>>(n);
@@ -95,19 +95,29 @@ void Benchmark() {
     // std::ifstream in("indexes/sift.txt");
     // std::ifstream in("reordered/gist_tree.txt");
     // std::ifstream in("reordered/gist_lc.txt");
-    std::ifstream in("indexes/sift.txt");
+    // std::ifstream in("indexes/glove.txt");
     // std::ifstream in("reordered/gist_lc50.txt");
-    // std::ifstream in("reordered/glove.txt");
+    std::ifstream in("reordered/glove_lc.txt");
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.txt"));
     HNSWInference<SPACE> hnsw(in, in_data);
+
+    if(dataset_name=="glove"){
+        // std::cout << "hi\n";
+        for(int i=0; i<1183514; ++i){
+            FloatType* pointer = (FloatType*) (hnsw.data + i*hnsw.struct_size + hnsw.struct_shift);
+            Normalize(pointer);
+        }
+        // NormalizeGlove(&(hnsw.data_long_[0]));
+    }
+
     in.close();
     in_data.close();
 
     ReadData();
 
     std::cout << "WARMUP\n";
-    std::ofstream trash("v3.txt");
-    for (int i = 200; i < 220; i += 1) {
+    std::ofstream trash("v4.txt");
+    for (int i = 1000; i < 1001; i += 10) {
         std::cout << i << "\n";
         evaluate(trash, hnsw, i, 10);
     }
@@ -186,15 +196,11 @@ void Create() {
             std::cout << i << "\n";
         }
         FloatType level = -std::log(dist(gen)) * el;
-        std::cout << level << "\n";
         hnsw.Add(level);
-        if(i==10){
-            return;
-        }
     }
-    // std::ofstream out(std::string("indexes/") + dataset_name + std::string(".txt"));
-    // hnsw.Save(out);
-    // out.close();
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string(".txt"));
+    hnsw.Save(out);
+    out.close();
 }
 
 int main() {
