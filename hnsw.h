@@ -11,8 +11,6 @@
 
 #include "primitives.h"
 
-#define REORDER
-
 struct Node {
     Node(IntType max_level) {
         neighbors_.resize(max_level + 1);
@@ -30,7 +28,7 @@ struct HNSW {
           max_elements_{max_elements} {
         was_ = std::vector<IntType>(max_elements_);
         graph_.reserve(max_elements_);
-        data_long_ = static_cast<float*>(aligned_alloc(64, (max_elements * SIZE) * sizeof(float)));
+        data_long_ = static_cast<FloatType*>(aligned_alloc(64, (max_elements * SIZE) * sizeof(FloatType)));
         reorder_to_new_.resize(max_elements);
         reorder_to_old_.resize(max_elements);
         for (int i = 0; i < max_elements; ++i) {
@@ -85,7 +83,7 @@ struct HNSW {
     IntType size0_ = 0;
 
     Space space_;
-    float ssg_cos = 0.5;
+    FloatType ssg_cos = 0.5;
 };
 
 template <typename Space>
@@ -142,7 +140,7 @@ inline QueueLess HNSW<Space>::SearchLayer(FloatType* query, IntType enter_point,
             break;
         }
         const IntType cursz = graph_[current].neighbors_[level].size();
-        for(int i=0; i<cursz; ++i){
+        for (int i = 0; i < cursz; ++i) {
             IntType next = graph_[current].neighbors_[level][i];
             if (was_[next] != current_was_) {
                 was_[next] = current_was_;
@@ -565,7 +563,7 @@ inline HNSW<Space>::HNSW(std::ifstream& file, std::ifstream& file_data) {
     for (int i = 0; i < reorder_new_size; ++i) {
         file >> reorder_to_new_[i];
     }
-    data_long_ = static_cast<float*>(aligned_alloc(64, (size_ * dim) * sizeof(float)));
+    data_long_ = static_cast<FloatType*>(aligned_alloc(64, (size_ * dim) * sizeof(FloatType)));
     for (IntType node = 0; node < size_; ++node) {
         for (IntType i = 0; i < dim; ++i) {
             FloatType x;
