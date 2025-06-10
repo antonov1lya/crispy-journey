@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string.h>
+#include <sys/mman.h>
 
 #include "primitives.h"
 
@@ -120,6 +121,17 @@ inline std::vector<IntType> HNSWInference<Space>::Search(FloatType* query, IntTy
     return array;
 }
 
+float* HugeAlloc(size_t total_size, size_t alignment){
+    size_t extra = alignment - 1;
+    void* raw_ptr = mmap(NULL, total_size + extra,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB,
+        -1, 0);
+    uintptr_t addr = (uintptr_t)raw_ptr;
+    uintptr_t aligned_addr = (addr + alignment - 1) & ~(alignment - 1);
+    return (float*)aligned_addr;
+}
+
 template <typename Space>
 inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& file_data) {
 
@@ -140,7 +152,9 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
     was_ = (IntType*)aligned_alloc(ALIGN64, size_ * sizeof(IntType));
     memset(was_, 0, size_ * sizeof(int));
 
-    data = (FloatType*)(aligned_alloc(ALIGN64, size_ * SIZE * sizeof(FloatType)));
+    // data = (FloatType*)(aligned_alloc(ALIGN64, size_ * SIZE * sizeof(FloatType)));
+    data = HugeAlloc(size_ * SIZE * sizeof(FloatType), 64);
+
     list = (IntType**)(aligned_alloc(ALIGN64, size_ * sizeof(IntType*)));
     list0 = (IntType*)(aligned_alloc(ALIGN64, size_ * (maxM0_ + 1) * sizeof(IntType)));
 
