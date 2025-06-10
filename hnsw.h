@@ -162,7 +162,7 @@ inline QueueLess HNSW<Space>::SearchLayer(FloatType* query, IntType enter_point,
 template <typename Space>
 inline std::vector<IntType> HNSW<Space>::SelectNeighbours(QueueLess& candidates, IntType M,
                                                           IntType maxM) {
-    // bool simple = false;
+    // bool simple = true;
     // if (simple) {
     //     std::vector<IntType> array;
     //     array.reserve(maxM + 1);
@@ -361,7 +361,7 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
     }
     std::cout << sum << "\n";
     std::cout << "START\n";
-    for (int _ = 0; _ < 100; _++) {
+    for (int _ = 0; _ < 110; _++) {
         std::cout << _ << "\n";
         for (int i = 0; i < size_; ++i) {
             if (i % 10000 == 0) {
@@ -563,7 +563,7 @@ inline HNSW<Space>::HNSW(std::ifstream& file, std::ifstream& file_data) {
     for (int i = 0; i < reorder_new_size; ++i) {
         file >> reorder_to_new_[i];
     }
-    data_long_ = static_cast<FloatType*>(aligned_alloc(64, (size_ * dim) * sizeof(FloatType)));
+    data_long_ = static_cast<FloatType*>(aligned_alloc(ALIGN64, (size_ * dim) * sizeof(FloatType)));
     for (IntType node = 0; node < size_; ++node) {
         for (IntType i = 0; i < dim; ++i) {
             FloatType x;
