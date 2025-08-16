@@ -162,18 +162,18 @@ inline QueueLess HNSW<Space>::SearchLayer(FloatType* query, IntType enter_point,
 template <typename Space>
 inline std::vector<IntType> HNSW<Space>::SelectNeighbours(QueueLess& candidates, IntType M,
                                                           IntType maxM) {
-    // bool simple = true;
-    // if (simple) {
-    //     std::vector<IntType> array;
-    //     array.reserve(maxM + 1);
-    //     while (!candidates.empty()) {
-    //         array.push_back(candidates.top().second);
-    //         candidates.pop();
-    //     }
-    //     std::reverse(array.begin(), array.end());
-    //     array.resize(std::min(M, static_cast<IntType>(array.size())));
-    //     return array;
-    // }
+    bool simple = false;
+    if (simple) {
+        std::vector<IntType> array;
+        array.reserve(maxM + 1);
+        while (!candidates.empty()) {
+            array.push_back(candidates.top().second);
+            candidates.pop();
+        }
+        std::reverse(array.begin(), array.end());
+        array.resize(std::min(M, static_cast<IntType>(array.size())));
+        return array;
+    }
     if (candidates.size() < M) {
         std::vector<IntType> array;
         array.reserve(maxM + 1);
@@ -211,55 +211,6 @@ inline std::vector<IntType> HNSW<Space>::SelectNeighbours(QueueLess& candidates,
     }
     return selected;
 }
-
-// template <typename Space>
-// inline std::vector<IntType> HNSW<Space>::SSG(IntType node, std::vector<IntType>& candidates,
-//                                              IntType M) {
-
-//     std::sort(candidates.begin(), candidates.end());
-//     int new_size = std::unique(candidates.begin(), candidates.end()) - candidates.begin();
-//     candidates.resize(new_size);
-
-//     QueueLess q;
-//     for (IntType neighbour : candidates) {
-//         q.emplace(space_.Distance(data_[node], data_[neighbour]), neighbour);
-//     }
-
-//     std::vector<std::pair<FloatType, IntType>> queue;
-//     queue.reserve(q.size());
-//     while (!q.empty()) {
-//         queue.push_back(q.top());
-//         q.pop();
-//     }
-//     std::reverse(queue.begin(), queue.end());
-//     std::vector<IntType> selected;
-//     std::vector<Point> dir;
-//     dir.reserve(M);
-//     selected.reserve(M + 1);
-//     for (auto& [distance, element] : queue) {
-//         if (selected.size() >= M) {
-//             break;
-//         }
-//         if (element == node)
-//             continue;
-//         Point curdir = data_[element] - data_[node];
-//         curdir.Normalize();
-//         bool good = true;
-//         for (IntType i = 0; i < selected.size(); ++i) {
-//             IntType neighbour = selected[i];
-//             FloatType cos = space_.Cos(dir[i], curdir);
-//             if (cos > ssg_cos) {
-//                 good = false;
-//                 break;
-//             }
-//         }
-//         if (good) {
-//             selected.push_back(element);
-//             dir.push_back(curdir);
-//         }
-//     }
-//     return selected;
-// }
 
 template <typename Space>
 inline void HNSW<Space>::TreeReOrdering() {
@@ -327,81 +278,9 @@ inline void HNSW<Space>::GraphReWrite() {
 }
 
 template <typename Space>
-inline void HNSW<Space>::SumOfModulesReOrdering() {
-    std::vector<std::vector<IntType>> graph_inv_(size_);
-    for (int i = 0; i < size_; ++i) {
-        for (int j : graph_[i].neighbors_[0]) {
-            graph_inv_[j].push_back(i);
-        }
-    }
-    auto ScoreF = [=](int x, int y) { return abs(reorder_to_new_[x] - reorder_to_new_[y]); };
-
-    auto GetScore = [=](int i, int j) {
-        int64_t score = 0;
-        for (int k : graph_[i].neighbors_[0]) {
-            score += ScoreF(i, k);
-        }
-        for (int k : graph_[j].neighbors_[0]) {
-            score += ScoreF(j, k);
-        }
-        for (int k : graph_inv_[i]) {
-            score += ScoreF(i, k);
-        }
-        for (int k : graph_inv_[j]) {
-            score += ScoreF(j, k);
-        }
-        return score;
-    };
-
-    int64_t sum = 0;
-    for (int i = 0; i < size_; ++i) {
-        for (int j : graph_[i].neighbors_[0]) {
-            sum += ScoreF(i, j);
-        }
-    }
-    std::cout << sum << "\n";
-    std::cout << "START\n";
-    for (int _ = 0; _ < 110; _++) {
-        std::cout << _ << "\n";
-        for (int i = 0; i < size_; ++i) {
-            if (i % 10000 == 0) {
-                std::cout << i << "\n";
-            }
-            for (int j = reorder_to_new_[i] + 1; (j <= reorder_to_new_[i] + 30) and (j < size_);
-                 ++j) {
-                int64_t l = reorder_to_old_[j];
-                int64_t mn_score = 0, index = -1;
-                for (int ne : graph_[i].neighbors_[0]) {
-                    int64_t score_old = GetScore(l, ne);
-                    std::swap(reorder_to_new_[l], reorder_to_new_[ne]);
-                    int64_t score_new = GetScore(l, ne);
-                    if (score_new - score_old < mn_score) {
-                        mn_score = score_new - score_old;
-                        index = ne;
-                    }
-                    std::swap(reorder_to_new_[l], reorder_to_new_[ne]);
-                }
-                if (mn_score < 0) {
-                    std::swap(reorder_to_new_[l], reorder_to_new_[index]);
-                    std::swap(reorder_to_old_[reorder_to_new_[l]],
-                              reorder_to_old_[reorder_to_new_[index]]);
-                }
-            }
-        }
-        sum = 0;
-        for (int i = 0; i < size_; ++i) {
-            for (int j : graph_[i].neighbors_[0]) {
-                sum += ScoreF(i, j);
-            }
-        }
-        std::cout << sum << "\n";
-    }
-}
-
-template <typename Space>
 inline void HNSW<Space>::ReOrdering() {
-    SumOfModulesReOrdering();
-    // TreeReOrdering();
+    // SumOfModulesReOrdering();
+    TreeReOrdering();
     GraphReWrite();
 }
 
@@ -452,42 +331,6 @@ inline std::vector<IntType> HNSW<Space>::Search(FloatType* query, IntType K, Int
     std::reverse(array.begin(), array.end());
     return array;
 }
-
-// template <typename Space>
-// inline void HNSW<Space>::Improve() {
-//     int l = 100, r = 50;
-//     std::vector<std::vector<IntType>> ne(size_);
-//     for (IntType node = 0; node < size_; ++node) {
-//         if (node % 10000 == 0) {
-//             std::cout << node << "\n";
-//         }
-//         for (IntType level = 0; level < 1; ++level) {
-//             std::vector<IntType> candidates;
-//             candidates.reserve(l);
-//             for (IntType x : graph_[node].neighbors_[level]) {
-//                 candidates.push_back(x);
-//                 for (IntType y : graph_[x].neighbors_[level]) {
-//                     candidates.push_back(y);
-//                 }
-//             }
-//             ne[node] = SSG(node, candidates, r);
-//         }
-//     }
-//     for (IntType node = 0; node < size_; ++node) {
-//         graph_[node].neighbors_[0] = ne[node];
-//     }
-//     for (IntType node = 0; node < size_; ++node) {
-//         if (node % 10000 == 0) {
-//             std::cout << node << "\n";
-//         }
-//         for (IntType level = 0; level < 1; ++level) {
-//             for (IntType x : graph_[node].neighbors_[level]) {
-//                 graph_[x].neighbors_[level].push_back(node);
-//                 graph_[x].neighbors_[level] = SSG(x, graph_[x].neighbors_[level], r);
-//             }
-//         }
-//     }
-// }
 
 template <typename Space>
 inline void HNSW<Space>::Save(std::ofstream& file) {
