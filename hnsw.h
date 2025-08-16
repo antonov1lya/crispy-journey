@@ -52,8 +52,9 @@ struct HNSW {
     std::vector<IntType> SelectNeighbours(QueueLess& candidates, IntType M, IntType maxM);
     std::vector<IntType> Search(FloatType* query, IntType K, IntType ef);
     std::vector<IntType> SSG(IntType node, std::vector<IntType>& candidates, IntType M);
-    void TreeReOrdering();
-    void SumOfModulesReOrdering();
+    void BFSTreeReOrdering();
+    void MSTTreeReOrdering();
+    // void SumOfModulesReOrdering();
     void GraphReWrite();
     void ReOrdering();
     IntType DfsStat(IntType cur);
@@ -213,7 +214,7 @@ inline std::vector<IntType> HNSW<Space>::SelectNeighbours(QueueLess& candidates,
 }
 
 template <typename Space>
-inline void HNSW<Space>::TreeReOrdering() {
+inline void HNSW<Space>::BFSTreeReOrdering() {
     std::vector<FloatType> means1(SIZE);
     for (int i = 0; i < size_; ++i) {
         for (int j = 0; j < means1.size(); ++j) {
@@ -231,6 +232,9 @@ inline void HNSW<Space>::TreeReOrdering() {
         }
     }
 
+    std::mt19937 gen(0);
+    std::uniform_real_distribution<float> dist(0, 1);
+
     std::queue<IntType> queue;
     bfs_tree_.resize(size_);
     std::vector<bool> was(size_);
@@ -242,6 +246,7 @@ inline void HNSW<Space>::TreeReOrdering() {
         int cur = queue.front();
         queue.pop();
         for (auto next : graph_[cur].neighbors_[0]) {
+            if(dist(gen)>=0.9) continue;
             if (!was[next]) {
                 was[next] = 1;
                 queue.push(next);
@@ -255,6 +260,77 @@ inline void HNSW<Space>::TreeReOrdering() {
     reorder_to_old_ = std::vector<IntType>(size_);
     DfsReorder(best_i);
 }
+
+template <typename Space>
+inline void HNSW<Space>::MSTTreeReOrdering() {
+    std::vector<FloatType> means1(SIZE);
+    for (int i = 0; i < size_; ++i) {
+        for (int j = 0; j < means1.size(); ++j) {
+            means1[j] += data_long_[i * SIZE + j];
+        }
+    }
+    for (int j = 0; j < means1.size(); ++j) {
+        means1[j] /= size_;
+    }
+    FloatType best_dist = 1e9, best_i = -1;
+    for (int i = 0; i < size_; ++i) {
+        if (space_.Distance(&(data_long_[i * SIZE]), &(means1[0])) < best_dist) {
+            best_dist = space_.Distance(&(data_long_[i * SIZE]), &(means1[0]));
+            best_i = i;
+        }
+    }
+
+    std::mt19937 gen(0);
+    std::uniform_real_distribution<float> distt(0, 1);
+
+    std::vector<std::vector<int>> full(size_);
+    for (int i = 0; i < size_; ++i) {
+        for (auto next : graph_[i].neighbors_[0]) {
+            full[i].push_back(next);
+            full[next].push_back(i);
+        }
+    }
+
+    for (int i = 0; i < size_; ++i) {
+        std::sort(full[i].begin(), full[i].end());
+        auto last = std::unique(full[i].begin(), full[i].end());
+        full[i].resize(std::distance(full[i].begin(), last));
+    }
+
+    std::set<std::pair<FloatType, int64_t>> q;
+    std::vector<FloatType> min_e(size_, 1e18);
+    std::vector<int64_t> sel_e(size_, -1);
+    q.insert(std::make_pair(0, best_i));
+    min_e[best_i] = 0;
+    std::vector<bool> selected(size_, false);
+    while (!q.empty()) {
+        int64_t v = q.begin()->second;
+        selected[v] = true;
+        q.erase(q.begin());
+        for (int64_t to : full[v]) {
+            FloatType cost = space_.Distance(&(data_long_[v * SIZE]), &(data_long_[to * SIZE]));
+            if (!selected[to] and cost < min_e[to]) {
+                q.erase(std::make_pair(min_e[to], to));
+                min_e[to] = cost;
+                sel_e[to] = v;
+                q.insert(std::make_pair(min_e[to], to));
+            }
+        }
+    }
+    bfs_tree_.resize(size_);
+    for (int i = 0; i < size_; ++i) {
+        if (sel_e[i] != -1) {
+            bfs_tree_[sel_e[i]].push_back(i);
+        }
+    }
+    
+    dfs_stat_ = std::vector<IntType>(size_);
+    DfsStat(best_i);
+    reorder_to_new_ = std::vector<IntType>(size_);
+    reorder_to_old_ = std::vector<IntType>(size_);
+    DfsReorder(best_i);
+}
+
 
 template <typename Space>
 inline void HNSW<Space>::GraphReWrite() {
@@ -279,8 +355,8 @@ inline void HNSW<Space>::GraphReWrite() {
 
 template <typename Space>
 inline void HNSW<Space>::ReOrdering() {
-    // SumOfModulesReOrdering();
-    TreeReOrdering();
+    BFSTreeReOrdering();
+    // MSTTreeReOrdering();
     GraphReWrite();
 }
 

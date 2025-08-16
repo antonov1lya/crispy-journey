@@ -12,9 +12,9 @@
 // #define SPACE SpaceCosine
 #define SPACE SpaceL2
 
-std::string dataset_name = "fashion_mnist";
+// std::string dataset_name = "fashion_mnist";
 // std::string dataset_name = "gist";
-// std::string dataset_name = "sift";
+std::string dataset_name = "sift";
 // std::string dataset_name = "glove";
 
 std::mt19937 gen(0);
@@ -89,7 +89,8 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef, int k =
 
 void Benchmark() {
 
-    std::ifstream in("reordered/fashion_mnist/lc_new.txt");
+    std::ifstream in("reordered_new/sift/bfs_random.txt");
+    // std::ifstream in("indexes/sift.txt");
 
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.txt"));
     HNSWInference<SPACE> hnsw(in, in_data);
@@ -105,27 +106,27 @@ void Benchmark() {
     ReadData();
 
     std::cout << "WARMUP\n";
-    std::ofstream trash("v3.txt");
-    for (int i = 10; i < 100; i += 10) {
+    std::ofstream trash("bfs_random.txt");
+    for (int i = 300; i < 301; i += 10) {
         std::cout << i << "\n";
         evaluate(trash, hnsw, i, 10);
     }
     trash.close();
 
-    std::cout << "START\n";
-    std::ofstream print("bench/fashion_mnist/lc_new.txt");
-    {
-        for (int j = 0; j < 5; j++)
-            for (int i = 10; i < 51; i += 5) {
-                std::cout << i << " " << j << "\n";
-                evaluate(print, hnsw, i, 10);
-            }
-        print << "NEXT\n";
-    }
+    // std::cout << "START\n";
+    // std::ofstream print("bench/fashion_mnist/lc_new.txt");
+    // {
+    //     for (int j = 0; j < 5; j++)
+    //         for (int i = 10; i < 51; i += 5) {
+    //             std::cout << i << " " << j << "\n";
+    //             evaluate(print, hnsw, i, 10);
+    //         }
+    //     print << "NEXT\n";
+    // }
 }
 
 void Reorder() {
-    std::ifstream in(std::string("indexes/") + dataset_name + std::string("_classic.txt"));
+    std::ifstream in(std::string("indexes/") + dataset_name + std::string(".txt"));
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.txt"));
     HNSW<SPACE> hnsw(in, in_data);
     in.close();
@@ -133,7 +134,7 @@ void Reorder() {
 
     hnsw.ReOrdering();
 
-    std::ofstream out(std::string("reordered/") + dataset_name + std::string("/lc_classic.txt"));
+    std::ofstream out(std::string("reordered_new/") + dataset_name + std::string("/bfs_random.txt"));
     hnsw.Save(out);
     out.close();
 }
