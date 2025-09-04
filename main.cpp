@@ -88,36 +88,7 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef, int k =
 }
 
 void Benchmark() {
-    // std::ifstream in("indexes/sift.txt");
-    // std::ifstream in("reordered/sift/sift_lc.txt");
-    // std::ifstream in("reordered/sift/sift_tree.txt");
-
-    // std::ifstream in("reordered/glovek5nn.txt");
-    // std::ifstream in("reordered/sift_tree.txt");
-
-    // std::ifstream in("reordered/sift_lc.txt");
-
-    // std::ifstream in("indexes/gist.txt");
-    // std::ifstream in("reordered/gist_lc.txt");
-    // std::ifstream in("reordered/gist_tree.txt");
-
-    // std::ifstream in("indexes/fashion_mnist.txt");
     std::ifstream in("reordered/fashion_mnist/lc_new.txt");
-    // std::ifstream in("reordered/fashion_mnist/lc_new.txt");
-
-    // std::ifstream in("indexes/glove.txt");
-    // std::ifstream in("reordered/glove/glove_lc_new.txt");
-    // std::ifstream in("reordered/glove/glove_lc_new.txt");
-    // std::ifstream in("reordered/glove/glove_lc.txt");
-    // std::ifstream in("reordered/glove/glove_tree.txt");
-    // std::ifstream in("reordered/glove/glove_gorder.txt");
-
-    // std::ifstream in("reordered/gloveglove_gorder.txt");
-    // std::ifstream in("reordered/glove_classic_lc.txt");
-    // std::ifstream in("reordered/gloveglove_gorder.txt");
-    // std::ifstream in("reordered/glove_tree.txt");
-    // std::ifstream in("reordered/glove_new.txt");
-    // std::ifstream in("reordered/gloveglovelevel1++.txt");
 
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.txt"));
     HNSWInference<SPACE> hnsw(in, in_data);
@@ -152,58 +123,12 @@ void Benchmark() {
     }
 }
 
-// void PrintGraph() {
-//     std::ifstream in("sift_reorder/lc_100k.txt");
-//     HNSW<SPACE> hnsw(in);
-//     in.close();
-
-//     std::ofstream print("output.txt");
-//     for (int i = 0; i < hnsw.size_; ++i) {
-//         for (int j : hnsw.graph_[i].neighbors_[0]) {
-//             print << i << " " << j << "\n";
-//         }
-//     }
-// }
-
 void Reorder() {
     std::ifstream in(std::string("indexes/") + dataset_name + std::string("_classic.txt"));
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.txt"));
     HNSW<SPACE> hnsw(in, in_data);
     in.close();
     in_data.close();
-
-    // std::ifstream order("perm.txt");
-    // for(int i=0; i<hnsw.size_; ++i){
-    //     order >> hnsw.reorder_to_new_[i];
-    // }
-
-    // for(int i=0; i<hnsw.size_; ++i){
-    //     hnsw.reorder_to_old_[hnsw.reorder_to_new_[i]]=i;
-    // }
-
-    // std::shuffle(hnsw.reorder_to_new_.begin(), hnsw.reorder_to_new_.end(), gen);
-    // for(int i=0; i<hnsw.size_; ++i){
-    //     hnsw.reorder_to_old_[hnsw.reorder_to_new_[i]]=i;
-    // }
-
-    // int sum=0;
-    // for(int i=0; i<hnsw.size_; ++i){
-    //     if(hnsw.graph_[i].neighbors_.size()==1){
-    //         hnsw.graph_[i].neighbors_[0].clear();
-    //     }else{
-    //         sum++;
-    //     }
-    //     // if(i%10000==0){
-    //     //     std::cout << i << "\n";
-    //     // }
-    //     // QueueLess q;
-    //     // for(int j: hnsw.graph_[i].neighbors_[0]){
-    //     //     q.push({hnsw.space_.Distance(&(hnsw.data_long_[i * SIZE]), &(hnsw.data_long_[j *
-    //     SIZE])), j});
-    //     // }
-    //     // hnsw.graph_[i].neighbors_[0] = hnsw.SelectNeighbours(q, 5, 5);
-    // }
-    // std::cout << sum << "\n";
 
     hnsw.ReOrdering();
 
@@ -253,73 +178,12 @@ void Create() {
     out.close();
 }
 
-void PrintGraph() {
-    // std::ifstream in(std::string("indexes/") + dataset_name + std::string("_classic.txt"));
-    // std::ifstream in("reordered/gloveglove_gorder.txt");
-    std::ifstream in("indexes/glove.txt");
-    std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.txt"));
-    HNSW<SPACE> hnsw(in, in_data);
-    in.close();
-    in_data.close();
-
-    std::ofstream out("glove_graph.txt");
-    for (int i = 0; i < hnsw.size_; ++i) {
-        for (int j : hnsw.graph_[i].neighbors_[0]) {
-            out << i << " " << j << "\n";
-        }
-    }
-    out.close();
-}
-
-void ReadReorder() {
-    std::ifstream in(std::string("indexes/") + dataset_name + std::string(".txt"));
-    std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.txt"));
-    HNSW<SPACE> hnsw(in, in_data);
-    in.close();
-    in_data.close();
-
-    std::ifstream order("perm.txt");
-    for (int i = 0; i < hnsw.size_; ++i) {
-        order >> hnsw.reorder_to_new_[i];
-    }
-
-    for (int i = 0; i < hnsw.size_; ++i) {
-        hnsw.reorder_to_old_[hnsw.reorder_to_new_[i]] = i;
-    }
-
-    // for(int i: hnsw.graph_[0].neighbors_[0]){
-    //     std::cout << i << " ";
-    // }
-    // std::cout << "\n";
-
-    // for(int i: hnsw.graph_[hnsw.reorder_to_old_[0]].neighbors_[0]){
-    //     std::cout << hnsw.reorder_to_new_[i] << " ";
-    // }
-    // std::cout << "\n";
-
-    hnsw.GraphReWrite();
-
-    // std::ofstream out(std::string("reordered/") + dataset_name + std::string("_lc_8196.txt"));
-    std::ofstream out(std::string("reordered/") + dataset_name + std::string("/lc_new.txt"));
-    hnsw.Save(out);
-    out.close();
-}
-
 int main() {
     // Create();
     Benchmark();
     // Reorder();
     // PrintGraph();
     // ReadReorder();
-
-    // std::ifstream in("reordered/fashion_mnist/lc_classic.txt");
-    // std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.txt"));
-    // HNSW<SPACE> hnsw(in, in_data);
-
-    // std::ofstream out("perm.txt");
-    // for(int i=0; i<hnsw.size_; ++i){
-    //     out << hnsw.reorder_to_new_[i] << " ";
-    // }
 
     return 0;
 }
