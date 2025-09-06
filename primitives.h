@@ -22,10 +22,10 @@ typedef std::priority_queue<std::pair<FloatType, IntType>,
 #define ALIGN64 64
 #define ALIGN4 4
 
-// #define SIZE 128
+#define SIZE 128
 // #define SIZE 960
 // #define SIZE 784
-#define SIZE 100
+// #define SIZE 100
 
 struct SpaceL2 {
     FloatType Distance(FloatType* x, FloatType* y) {

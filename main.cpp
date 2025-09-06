@@ -9,13 +9,13 @@
 #include "hnsw_inference.h"
 #include "primitives.h"
 
-#define SPACE SpaceCosine
-// #define SPACE SpaceL2
+// #define SPACE SpaceCosine
+#define SPACE SpaceL2
 
 // std::string dataset_name = "fashion_mnist";
 // std::string dataset_name = "gist";
-// std::string dataset_name = "sift";
-std::string dataset_name = "glove";
+std::string dataset_name = "sift";
+// std::string dataset_name = "glove";
 
 std::mt19937 gen(0);
 
@@ -88,8 +88,8 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef, int k =
 }
 
 void Benchmark() {
-    std::ifstream in("indexes/glove.txt");
-    // std::ifstream in("reordered/glove/lc_new.txt");
+    // std::ifstream in("indexes/sift.txt");
+    std::ifstream in("reordered/sift/mst.txt");
 
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.txt"));
     HNSWInference<SPACE> hnsw(in, in_data);
@@ -112,12 +112,12 @@ void Benchmark() {
     }
     trash.close();
 
+    // k=10
     // sift 30,100,10
     // glove 200,1500,100
-    // fashion_mnist 10,50,5
 
     std::cout << "START\n";
-    std::ofstream print("bench/glove/no_reorder.txt");
+    std::ofstream print("bench/sift/mst.txt");
     {
         for (int j = 0; j < 5; j++)
             for (int i = 30; i <= 100; i += 10) {
