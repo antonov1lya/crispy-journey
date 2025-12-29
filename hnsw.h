@@ -36,13 +36,18 @@ struct HNSW {
             reorder_to_new_[i] = i;
             reorder_to_old_[i] = i;
         }
-        for (IntType node = 0; node < max_elements; ++node) {
-            for (IntType i = 0; i < SIZE; ++i) {
-                FloatType x;
-                file_data >> x;
-                data_long_[reorder_to_new_[node] * SIZE + i] = x;
-            }
-        }
+        file_data.read(reinterpret_cast<char*>(data_long_),
+                       sizeof(FloatType) * max_elements * SIZE);
+        // auto ReadBinaryFloat = [&file_data](FloatType& value) {
+        //     file_data.read(reinterpret_cast<char*>(&value), sizeof(FloatType));
+        // };
+        // for (IntType node = 0; node < max_elements; ++node) {
+        //     for (IntType i = 0; i < SIZE; ++i) {
+        //         FloatType x;
+        //         file_data >> x;
+        //         data_long_[reorder_to_new_[node] * SIZE + i] = x;
+        //     }
+        // }
     }
     HNSW(std::ifstream& file, std::ifstream& file_data);
     ~HNSW() {
@@ -59,7 +64,6 @@ struct HNSW {
     void ReOrdering();
     IntType DfsStat(IntType cur);
     void DfsReorder(IntType cur);
-
     void Save(std::ofstream& file);
     IntType M_;
     IntType maxM_;
@@ -472,50 +476,55 @@ inline std::vector<IntType> HNSW<Space>::Search(FloatType* query, IntType K, Int
 
 template <typename Space>
 inline void HNSW<Space>::Save(std::ofstream& file) {
-    file << size_ << "\n";
-    file << enter_point_ << "\n";
-    file << M_ << "\n";
-    file << ef_construction_ << "\n";
-    file << max_level_ << "\n";
+    auto WriteBinaryInt = [&file](IntType value) {
+        file.write(reinterpret_cast<char*>(&value), sizeof(IntType));
+    };
+    WriteBinaryInt(size_);
+    WriteBinaryInt(enter_point_);
+    WriteBinaryInt(M_);
+    WriteBinaryInt(ef_construction_);
+    WriteBinaryInt(max_level_);
     IntType dim = SIZE;
-    file << dim << "\n";
+    WriteBinaryInt(dim);
     for (IntType node = 0; node < size_; ++node) {
-        file << graph_[node].neighbors_.size() << '\n';
+        WriteBinaryInt(graph_[node].neighbors_.size());
         for (IntType level = 0; level < graph_[node].neighbors_.size(); ++level) {
-            file << graph_[node].neighbors_[level].size() << " ";
+            WriteBinaryInt(graph_[node].neighbors_[level].size());
             for (IntType neighbour : graph_[node].neighbors_[level]) {
-                file << neighbour << " ";
+                WriteBinaryInt(neighbour);
             }
-            file << "\n";
         }
     }
-    file << reorder_to_old_.size() << "\n";
+    WriteBinaryInt(reorder_to_old_.size());
     for (IntType node : reorder_to_old_) {
-        file << node << " ";
+        WriteBinaryInt(node);
     }
-    file << reorder_to_new_.size() << "\n";
+    WriteBinaryInt(reorder_to_new_.size());
     for (IntType node : reorder_to_new_) {
-        file << node << " ";
+        WriteBinaryInt(node);
     }
 }
 
 template <typename Space>
 inline HNSW<Space>::HNSW(std::ifstream& file, std::ifstream& file_data) {
-    file >> size_;
+    auto ReadBinaryInt = [&file](IntType& value) {
+        file.read(reinterpret_cast<char*>(&value), sizeof(IntType));
+    };
+    ReadBinaryInt(size_);
     graph_.reserve(size_);
     was_ = std::vector<IntType>(size_);
     max_elements_ = size_;
-    file >> enter_point_;
-    file >> M_;
+    ReadBinaryInt(enter_point_);
+    ReadBinaryInt(M_);
     maxM_ = M_;
     maxM0_ = 2 * M_;
-    file >> ef_construction_;
-    file >> max_level_;
+    ReadBinaryInt(ef_construction_);
+    ReadBinaryInt(max_level_);
     IntType dim;
-    file >> dim;
+    ReadBinaryInt(dim);
     for (IntType node = 0; node < size_; ++node) {
         IntType level_number;
-        file >> level_number;
+        ReadBinaryInt(level_number);
         graph_.push_back(Node(level_number - 1));
         for (IntType level = 0; level < level_number; ++level) {
             if (level == 0) {
@@ -524,25 +533,25 @@ inline HNSW<Space>::HNSW(std::ifstream& file, std::ifstream& file_data) {
                 graph_[node].neighbors_[level].reserve(maxM_);
             }
             IntType neighbour_number;
-            file >> neighbour_number;
+            ReadBinaryInt(neighbour_number);
             for (IntType it = 0; it < neighbour_number; ++it) {
                 IntType neighbour;
-                file >> neighbour;
+                ReadBinaryInt(neighbour);
                 graph_[node].neighbors_[level].push_back(neighbour);
             }
         }
     }
     IntType reorder_old_size;
-    file >> reorder_old_size;
+    ReadBinaryInt(reorder_old_size);
     reorder_to_old_.resize(reorder_old_size);
     for (int i = 0; i < reorder_old_size; ++i) {
-        file >> reorder_to_old_[i];
+        ReadBinaryInt(reorder_to_old_[i]);
     }
     IntType reorder_new_size;
-    file >> reorder_new_size;
+    ReadBinaryInt(reorder_new_size);
     reorder_to_new_.resize(reorder_new_size);
     for (int i = 0; i < reorder_new_size; ++i) {
-        file >> reorder_to_new_[i];
+        ReadBinaryInt(reorder_to_new_[i]);
     }
     data_long_ = static_cast<FloatType*>(aligned_alloc(ALIGN64, (size_ * dim) * sizeof(FloatType)));
     for (IntType node = 0; node < size_; ++node) {
