@@ -22,6 +22,7 @@ typedef std::priority_queue<std::pair<FloatType, IntType>,
 #define ALIGN64 64
 #define ALIGN4 4
 
+// const int SIZE = 128;
 #define SIZE 128
 // #define SIZE 960
 // #define SIZE 784

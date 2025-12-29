@@ -193,14 +193,14 @@ void Create() {
     // out.close();
 
     std::ofstream out("sift.bin", std::ios::binary);
-    hnsw.BinarySave(out);
+    hnsw.Save(out);
     out.close();
 }
 
 int main() {
     // DO: sudo sysctl vm.nr_hugepages=1024
-    Create();
-    // Benchmark();
+    // Create();
+    Benchmark();
     // Reorder();
     // PrintGraph();
     // ReadReorder();

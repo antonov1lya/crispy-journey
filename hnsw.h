@@ -64,9 +64,7 @@ struct HNSW {
     void ReOrdering();
     IntType DfsStat(IntType cur);
     void DfsReorder(IntType cur);
-
     void Save(std::ofstream& file);
-    void BinarySave(std::ofstream& file);
     IntType M_;
     IntType maxM_;
     IntType maxM0_;
@@ -478,35 +476,6 @@ inline std::vector<IntType> HNSW<Space>::Search(FloatType* query, IntType K, Int
 
 template <typename Space>
 inline void HNSW<Space>::Save(std::ofstream& file) {
-    file << size_ << "\n";
-    file << enter_point_ << "\n";
-    file << M_ << "\n";
-    file << ef_construction_ << "\n";
-    file << max_level_ << "\n";
-    IntType dim = SIZE;
-    file << dim << "\n";
-    for (IntType node = 0; node < size_; ++node) {
-        file << graph_[node].neighbors_.size() << '\n';
-        for (IntType level = 0; level < graph_[node].neighbors_.size(); ++level) {
-            file << graph_[node].neighbors_[level].size() << " ";
-            for (IntType neighbour : graph_[node].neighbors_[level]) {
-                file << neighbour << " ";
-            }
-            file << "\n";
-        }
-    }
-    file << reorder_to_old_.size() << "\n";
-    for (IntType node : reorder_to_old_) {
-        file << node << " ";
-    }
-    file << reorder_to_new_.size() << "\n";
-    for (IntType node : reorder_to_new_) {
-        file << node << " ";
-    }
-}
-
-template <typename Space>
-inline void HNSW<Space>::BinarySave(std::ofstream& file) {
     auto WriteBinaryInt = [&file](IntType value) {
         file.write(reinterpret_cast<char*>(&value), sizeof(IntType));
     };
