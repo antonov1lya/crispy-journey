@@ -121,12 +121,10 @@ inline std::vector<IntType> HNSWInference<Space>::Search(FloatType* query, IntTy
     return array;
 }
 
-float* HugeAlloc(size_t total_size, size_t alignment){
+float* HugeAlloc(size_t total_size, size_t alignment) {
     size_t extra = alignment - 1;
-    void* raw_ptr = mmap(NULL, total_size + extra,
-        PROT_READ | PROT_WRITE,
-        MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB,
-        -1, 0);
+    void* raw_ptr = mmap(NULL, total_size + extra, PROT_READ | PROT_WRITE,
+                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, -1, 0);
     uintptr_t addr = (uintptr_t)raw_ptr;
     uintptr_t aligned_addr = (addr + alignment - 1) & ~(alignment - 1);
     return (float*)aligned_addr;
@@ -134,21 +132,20 @@ float* HugeAlloc(size_t total_size, size_t alignment){
 
 template <typename Space>
 inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& file_data) {
+    auto ReadBinaryInt = [&file](IntType& value) {
+        file.read(reinterpret_cast<char*>(&value), sizeof(IntType));
+    };
 
-    file >> size_;
+    ReadBinaryInt(size_);
     max_elements_ = size_;
-
-    file >> enter_point_;
-    file >> M_;
+    ReadBinaryInt(enter_point_);
+    ReadBinaryInt(M_);
     maxM_ = M_;
     maxM0_ = 2 * M_;
-
-    file >> ef_construction_;
-    file >> max_level_;
-
+    ReadBinaryInt(ef_construction_);
+    ReadBinaryInt(max_level_);
     IntType dim;
-    file >> dim;
-
+    ReadBinaryInt(dim);
     was_ = (IntType*)aligned_alloc(ALIGN64, size_ * sizeof(IntType));
     memset(was_, 0, size_ * sizeof(int));
 
@@ -160,15 +157,14 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
 
     for (IntType node = 0; node < size_; ++node) {
         IntType level_number;
-        file >> level_number;
+        ReadBinaryInt(level_number);
         if (level_number > 1) {
             list[node] = (IntType*)(aligned_alloc(
                 ALIGN4, (level_number - 1) * (maxM_ + 1) * sizeof(IntType)));
         }
         for (IntType level = 0; level < level_number; ++level) {
             IntType neighbour_number;
-            file >> neighbour_number;
-
+            ReadBinaryInt(neighbour_number);
             IntType* pointer;
             if (level == 0) {
                 pointer = (IntType*)(list0 + (maxM0_ + 1) * node);
@@ -179,30 +175,34 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
 
             for (IntType it = 0; it < neighbour_number; ++it) {
                 IntType neighbour;
-                file >> neighbour;
+                ReadBinaryInt(neighbour);
                 pointer[it + 1] = neighbour;
             }
         }
     }
 
     IntType reorder_old_size;
-    file >> reorder_old_size;
+    ReadBinaryInt(reorder_old_size);
     reorder_to_old_.resize(reorder_old_size);
     for (IntType i = 0; i < reorder_old_size; ++i) {
-        file >> reorder_to_old_[i];
+        ReadBinaryInt(reorder_to_old_[i]);
     }
 
     IntType reorder_new_size;
-    file >> reorder_new_size;
+    ReadBinaryInt(reorder_new_size);
     reorder_to_new_.resize(reorder_new_size);
     for (IntType i = 0; i < reorder_new_size; ++i) {
-        file >> reorder_to_new_[i];
+        ReadBinaryInt(reorder_to_new_[i]);
     }
+
+    auto ReadBinaryFloat = [&file_data](FloatType& value) {
+        file_data.read(reinterpret_cast<char*>(&value), sizeof(FloatType));
+    };
 
     for (IntType node = 0; node < size_; ++node) {
         FloatType* pointer = (FloatType*)(data + SIZE * reorder_to_new_[node]);
         for (IntType i = 0; i < dim; ++i) {
-            file_data >> pointer[i];
+            ReadBinaryFloat(pointer[i]);
         }
     }
 }

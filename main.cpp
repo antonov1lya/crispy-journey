@@ -89,9 +89,10 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef, int k =
 
 void Benchmark() {
     // std::ifstream in("indexes/sift.txt");
-    std::ifstream in("reordered/sift/mst.txt");
-
-    std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.txt"));
+    // std::ifstream in("reordered/sift/mst.txt");
+    std::ifstream in("sift.bin", std::ios::binary);
+    std::ifstream in_data("datasets/sift1m/data.bin", std::ios::binary);
+    // std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.txt"));
     HNSWInference<SPACE> hnsw(in, in_data);
 
     if (dataset_name == "glove") {
@@ -106,7 +107,7 @@ void Benchmark() {
 
     std::cout << "WARMUP\n";
     std::ofstream trash("cache.txt");
-    for (int i = 30; i <= 100; i += 10) {
+    for (int i = 300; i <= 300; i += 10) {
         std::cout << i << "\n";
         evaluate(trash, hnsw, i, 10);
     }
@@ -116,16 +117,16 @@ void Benchmark() {
     // sift 30,100,10
     // glove 200,1500,100
 
-    std::cout << "START\n";
-    std::ofstream print("bench/sift/mst.txt");
-    {
-        for (int j = 0; j < 5; j++)
-            for (int i = 30; i <= 100; i += 10) {
-                std::cout << i << " " << j << "\n";
-                evaluate(print, hnsw, i, 10);
-            }
-        print << "NEXT\n";
-    }
+    // std::cout << "START\n";
+    // std::ofstream print("bench/sift/mst.txt");
+    // {
+    //     for (int j = 0; j < 5; j++)
+    //         for (int i = 30; i <= 100; i += 10) {
+    //             std::cout << i << " " << j << "\n";
+    //             evaluate(print, hnsw, i, 10);
+    //         }
+    //     print << "NEXT\n";
+    // }
 }
 
 void Reorder() {
@@ -149,7 +150,8 @@ void Reorder() {
 }
 
 void Create() {
-    std::ifstream in(std::string("datasets/") + dataset_name + std::string("/data.txt"));
+    // std::ifstream in(std::string("datasets/") + dataset_name + std::string("/data.txt"));
+    std::ifstream in("datasets/sift1m/data.bin", std::ios::binary);
     size_t M, efConstruction, n;
     if (dataset_name == "fashion_mnist") {
         M = 25;
@@ -157,8 +159,10 @@ void Create() {
         n = 60000;
     }
     if (dataset_name == "sift") {
-        M = 25;
-        efConstruction = 600;
+        // M = 25;
+        // efConstruction = 600;
+        M = 16;
+        efConstruction = 64;
         n = 1000000;
     }
     if (dataset_name == "glove") {
@@ -184,15 +188,19 @@ void Create() {
         FloatType level = -std::log(dist(gen)) * el;
         hnsw.Add(level);
     }
-    std::ofstream out(std::string("indexes/") + dataset_name + std::string("_classic.txt"));
-    hnsw.Save(out);
+    // std::ofstream out(std::string("indexes/") + dataset_name + std::string("_classic.txt"));
+    // hnsw.Save(out);
+    // out.close();
+
+    std::ofstream out("sift.bin", std::ios::binary);
+    hnsw.BinarySave(out);
     out.close();
 }
 
 int main() {
     // DO: sudo sysctl vm.nr_hugepages=1024
-    // Create();
-    Benchmark();
+    Create();
+    // Benchmark();
     // Reorder();
     // PrintGraph();
     // ReadReorder();
