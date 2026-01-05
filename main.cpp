@@ -100,13 +100,39 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef, int k =
 }
 
 void Benchmark() {
-    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/base.bin"),
+    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/local_search.bin"),
                      std::ios::binary);
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.bin"),
                           std::ios::binary);
     HNSWInference<SPACE> hnsw(in, in_data);
     in.close();
     in_data.close();
+
+    std::ifstream file_data_pq(
+        std::string("datasets/") + dataset_name + std::string("/data_pq_16p_8b.bin"),
+        std::ios::binary);
+    std::ifstream file_centroids(
+        std::string("datasets/") + dataset_name + std::string("/centroids_16p_8b.bin"),
+        std::ios::binary);
+    hnsw.LoadQuantization(file_data_pq, file_centroids);
+    file_data_pq.close();
+    file_centroids.close();
+
+    // hnsw.FillTable(hnsw.data);
+
+    // std::cout << std::setprecision(4) << std::fixed;
+
+    // for (int i = 0; i < 8; ++i) {
+    //     std::cout << hnsw.GetDistance(i) << "\n";
+    // }
+
+    // std::cout << std::setprecision(4) << std::fixed;
+    // for (int i = 0; i < SUBSPACES; ++i){
+    //     for (int code = 0; code < 256; ++code){
+    //         std::cout << hnsw.pqtable[i][code] << " ";
+    //     }
+    //     std::cout << "\n";
+    // }
 
     // if (dataset_name == "glove") {
     //     for (int i = 0; i < 1183514; ++i) {
@@ -117,8 +143,8 @@ void Benchmark() {
     ReadData();
 
     std::cout << "WARMUP\n";
-    std::ofstream trash(std::string("logs/") + dataset_name + std::string("/result.txt"));
-    for (int i = 1000; i <= 1000; i += 10) {
+    std::ofstream trash(std::string("logs/") + dataset_name + std::string("/new_alloc.txt"));
+    for (int i = 100; i <= 100; i += 10) {
         std::cout << i << "\n";
         evaluate(trash, hnsw, i, 10);
     }
@@ -157,7 +183,7 @@ void Reorder() {
 
     hnsw.ReOrdering();
 
-    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/mst.bin"),
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/annealing.bin"),
                       std::ios::binary);
     hnsw.Save(out);
     out.close();
@@ -176,7 +202,7 @@ void Create() {
         // M = 25;
         // efConstruction = 600;
         M = 16;
-        efConstruction = 32;
+        efConstruction = 128;
         n = 1000000;
     }
     if (dataset_name == "glove") {
