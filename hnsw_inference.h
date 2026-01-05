@@ -240,27 +240,49 @@ inline std::vector<IntType> HNSWInference<Space>::Search(FloatType* query, IntTy
 template <typename Space>
 inline std::vector<IntType> HNSWInference<Space>::SearchPQ(FloatType* query, IntType K,
                                                            IntType ef) {
+    // const int NUM = 20;
     FillTable(query);
     IntType enter_point = enter_point_;
     for (IntType i = max_level_; i >= 1; --i) {
         enter_point = SearchLayerPQ(query, enter_point, 1, i).top().second;
     }
     auto nearest_neighbours = SearchLayerPQ(query, enter_point, ef, 0);
-    while (nearest_neighbours.size() > K) {
+    // while (nearest_neighbours.size() > NUM * K) {
+    //     nearest_neighbours.pop();
+    // }
+    std::vector<std::pair<FloatType, IntType>> candidates;
+    // candidates.reserve(NUM * K);
+    candidates.reserve(nearest_neighbours.size());
+    while (!nearest_neighbours.empty()) {
+        IntType next = nearest_neighbours.top().second;
+        FloatType* ne_pointer = data + SIZE * next;
+        FloatType distance = space_.Distance(ne_pointer, query);
         nearest_neighbours.pop();
+        candidates.push_back({distance, next});
     }
+    std::sort(candidates.begin(), candidates.end());
     std::vector<IntType> array;
     array.reserve(nearest_neighbours.size());
-    while (!nearest_neighbours.empty()) {
-#ifdef REORDER
-        array.push_back(reorder_to_old_[nearest_neighbours.top().second]);
-#else
-        array.push_back(nearest_neighbours.top().second);
-#endif
-        nearest_neighbours.pop();
+    for (int i = 0; i < std::min(K, (IntType)candidates.size()); ++i) {
+        array.push_back(reorder_to_old_[candidates[i].second]);
     }
-    std::reverse(array.begin(), array.end());
     return array;
+
+    //     while (nearest_neighbours.size() > K) {
+    //         nearest_neighbours.pop();
+    //     }
+    //     std::vector<IntType> array;
+    //     array.reserve(nearest_neighbours.size());
+    //     while (!nearest_neighbours.empty()) {
+    // #ifdef REORDER
+    //         array.push_back(reorder_to_old_[nearest_neighbours.top().second]);
+    // #else
+    //         array.push_back(nearest_neighbours.top().second);
+    // #endif
+    //         nearest_neighbours.pop();
+    //     }
+    //     std::reverse(array.begin(), array.end());
+    //     return array;
 }
 
 // float* HugeAlloc(size_t total_size, size_t alignment) {
