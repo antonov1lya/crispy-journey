@@ -143,7 +143,7 @@ void Benchmark() {
     ReadData();
 
     std::cout << "WARMUP\n";
-    std::ofstream trash(std::string("logs/") + dataset_name + std::string("/new_alloc1.txt"));
+    std::ofstream trash(std::string("logs/") + dataset_name + std::string("/base.txt"));
     for (int i = 1000; i <= 1000; i += 10) {
         std::cout << i << "\n";
         evaluate(trash, hnsw, i, 10);

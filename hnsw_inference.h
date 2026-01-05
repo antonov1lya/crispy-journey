@@ -40,7 +40,7 @@ struct HNSWInference {
 
     uint8_t* quantized_data;
     FloatType* centroids;
-    std::vector<std::vector<FloatType>> pqtable;
+    std::array<std::array<FloatType, 256>, SUBSPACES> pq_table;
 };
 
 template <typename Space>
@@ -70,7 +70,7 @@ inline void HNSWInference<Space>::FillTable(FloatType* query) {
     for (int i = 0; i < SUBSPACES; ++i) {
         FloatType* subquery = query + i * SUBSIZE;
         for (int code = 0; code < BITS; ++code) {
-            pqtable[i][code] = space_.DistanceSubspace(subquery, pointer);
+            pq_table[i][code] = space_.DistanceSubspace(subquery, pointer);
             pointer += SUBSIZE;
         }
     }
@@ -81,7 +81,7 @@ inline FloatType HNSWInference<Space>::GetDistance(IntType node) {
     uint8_t* query = quantized_data + node * SUBSPACES;
     FloatType result = 0;
     for (int i = 0; i < SUBSPACES; ++i) {
-        result += pqtable[i][query[i]];
+        result += pq_table[i][query[i]];
     }
     return result;
 }
@@ -120,13 +120,13 @@ inline QueueLess HNSWInference<Space>::SearchLayer(FloatType* query, IntType ent
         IntType cursz = pointer[0];
 
         _mm_prefetch((char*)(was_ + *(pointer + 1)), _MM_HINT_T0);
-        _mm_prefetch((char*)(quantized_data + (*(pointer + 1)) * SUBSIZE), _MM_HINT_T0);
+        _mm_prefetch((char*)(data + (*(pointer + 1)) * SIZE), _MM_HINT_T0);
 
         for (IntType i = 1; i <= cursz; ++i) {
             IntType next = pointer[i];
 
             _mm_prefetch((char*)(was_ + *(pointer + i + 1)), _MM_HINT_T0);
-            _mm_prefetch((char*)(quantized_data + (*(pointer + i + 1)) * SUBSIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + (*(pointer + i + 1)) * SIZE), _MM_HINT_T0);
 
             if (was_[next] != current_was_) {
                 was_[next] = current_was_;
@@ -154,8 +154,6 @@ inline QueueLess HNSWInference<Space>::SearchLayerPQ(FloatType* query, IntType e
                                                      IntType ef, IntType level) {
     was_[enter_point] = ++current_was_;
     QueueGreater candidates;
-    // FloatType* ep_pointer = data + SIZE * enter_point;
-    // FloatType enter_point_distance = space_.Distance(ep_pointer, query);
     FloatType enter_point_distance = GetDistance(enter_point);
 
     candidates.emplace(enter_point_distance, enter_point);
@@ -183,20 +181,18 @@ inline QueueLess HNSWInference<Space>::SearchLayerPQ(FloatType* query, IntType e
         IntType cursz = pointer[0];
 
         _mm_prefetch((char*)(was_ + *(pointer + 1)), _MM_HINT_T0);
-        // _mm_prefetch((char*)(data + (*(pointer + 1)) * SIZE), _MM_HINT_T0);
+        _mm_prefetch((char*)(quantized_data + (*(pointer + 1)) * SUBSPACES), _MM_HINT_T0);
 
         for (IntType i = 1; i <= cursz; ++i) {
             IntType next = pointer[i];
 
             _mm_prefetch((char*)(was_ + *(pointer + i + 1)), _MM_HINT_T0);
-            // _mm_prefetch((char*)(data + (*(pointer + i + 1)) * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(quantized_data + (*(pointer + i + 1)) * SUBSPACES), _MM_HINT_T0);
 
             if (was_[next] != current_was_) {
                 was_[next] = current_was_;
                 furthest_distance = nearest_neighbours.top().first;
 
-                // FloatType* ne_pointer = data + SIZE * next;
-                // FloatType distance = space_.Distance(ne_pointer, query);
                 FloatType distance = GetDistance(next);
 
                 if (distance < furthest_distance or nearest_neighbours.size() < ef) {
@@ -240,18 +236,13 @@ inline std::vector<IntType> HNSWInference<Space>::Search(FloatType* query, IntTy
 template <typename Space>
 inline std::vector<IntType> HNSWInference<Space>::SearchPQ(FloatType* query, IntType K,
                                                            IntType ef) {
-    // const int NUM = 20;
     FillTable(query);
     IntType enter_point = enter_point_;
     for (IntType i = max_level_; i >= 1; --i) {
         enter_point = SearchLayerPQ(query, enter_point, 1, i).top().second;
     }
     auto nearest_neighbours = SearchLayerPQ(query, enter_point, ef, 0);
-    // while (nearest_neighbours.size() > NUM * K) {
-    //     nearest_neighbours.pop();
-    // }
     std::vector<std::pair<FloatType, IntType>> candidates;
-    // candidates.reserve(NUM * K);
     candidates.reserve(nearest_neighbours.size());
     while (!nearest_neighbours.empty()) {
         IntType next = nearest_neighbours.top().second;
@@ -267,32 +258,7 @@ inline std::vector<IntType> HNSWInference<Space>::SearchPQ(FloatType* query, Int
         array.push_back(reorder_to_old_[candidates[i].second]);
     }
     return array;
-
-    //     while (nearest_neighbours.size() > K) {
-    //         nearest_neighbours.pop();
-    //     }
-    //     std::vector<IntType> array;
-    //     array.reserve(nearest_neighbours.size());
-    //     while (!nearest_neighbours.empty()) {
-    // #ifdef REORDER
-    //         array.push_back(reorder_to_old_[nearest_neighbours.top().second]);
-    // #else
-    //         array.push_back(nearest_neighbours.top().second);
-    // #endif
-    //         nearest_neighbours.pop();
-    //     }
-    //     std::reverse(array.begin(), array.end());
-    //     return array;
 }
-
-// float* HugeAlloc(size_t total_size, size_t alignment) {
-//     size_t extra = alignment - 1;
-//     void* raw_ptr = mmap(NULL, total_size + extra, PROT_READ | PROT_WRITE,
-//                          MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, -1, 0);
-//     uintptr_t addr = (uintptr_t)raw_ptr;
-//     uintptr_t aligned_addr = (addr + alignment - 1) & ~(alignment - 1);
-//     return (float*)aligned_addr;
-// }
 
 FloatType* HugeAlloc(size_t total_size_bytes) {
     size_t hugepage_size = 2 * 1024 * 1024;
@@ -321,8 +287,6 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
     was_ = (IntType*)aligned_alloc(ALIGN64, size_ * sizeof(IntType));
     memset(was_, 0, size_ * sizeof(int));
 
-    // data = (FloatType*)(aligned_alloc(ALIGN64, size_ * SIZE * sizeof(FloatType)));
-    // data = HugeAlloc(size_ * SIZE * sizeof(FloatType), 64);
     data = HugeAlloc(size_ * SIZE * sizeof(FloatType));
 
     list = (IntType**)(aligned_alloc(ALIGN64, size_ * sizeof(IntType*)));
@@ -378,6 +342,4 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
             ReadBinaryFloat(pointer[i]);
         }
     }
-
-    pqtable = std::vector<std::vector<FloatType>>(SUBSPACES, std::vector<FloatType>(256));
 }
