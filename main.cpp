@@ -21,15 +21,10 @@ std::mt19937 gen(0);
 
 std::uniform_real_distribution<FloatType> dist(0, 1);
 
-// std::vector<std::vector<FloatType>> query_data;
 FloatType* query_data;
 std::vector<std::set<IntType>> groundtruth_data;
 
-void NormalizeGlove(FloatType* array) {
-    for (IntType i = 0; i < 1183514; ++i) {
-        Normalize(&(array[i * SIZE]));
-    }
-}
+const int kNN = 10;
 
 void ReadData() {
     std::ifstream query(std::string("datasets/") + dataset_name + std::string("/query.bin"),
@@ -41,18 +36,9 @@ void ReadData() {
     if (dataset_name == "gist") {
         n = 1000;
     }
-    int k = 10;
-    // query_data = std::vector<std::vector<FloatType>>(n, std::vector<FloatType>(SIZE));
+
     query_data = (FloatType*)malloc(n * SIZE * sizeof(FloatType));
     query.read(reinterpret_cast<char*>(query_data), n * SIZE * sizeof(FloatType));
-    // for (int i = 0; i < n; ++i) {
-    //     for (int j = 0; j < SIZE; ++j) {
-    //         query >> query_data[i][j];
-    //     }
-    //     if (dataset_name == "glove") {
-    //         Normalize(&query_data[i][0]);
-    //     }
-    // }
 
     auto ReadBinaryInt = [&groundtruth](IntType& value) {
         groundtruth.read(reinterpret_cast<char*>(&value), sizeof(IntType));
@@ -63,18 +49,16 @@ void ReadData() {
         for (int j = 0; j < 100; ++j) {
             IntType x;
             ReadBinaryInt(x);
-            // groundtruth >> x;
-            if (j < k) {
+            if (j < kNN) {
                 groundtruth_data[i].insert(x);
             }
         }
     }
     query.close();
     groundtruth.close();
-    // free(query_data);
 }
 
-void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef, int k = 10) {
+void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
     int n = 10000;
     if (dataset_name == "gist") {
         n = 1000;
@@ -83,12 +67,12 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef, int k =
     hnsw.space_.FlushComputationsNumber();
     auto begin = std::chrono::steady_clock::now();
     for (int i = 0; i < n; ++i) {
-        auto res = hnsw.Search(&query_data[i * SIZE], k, ef);
+        auto res = hnsw.SearchPQ(&query_data[i * SIZE], kNN, ef);
         double count = 0;
         for (auto x : res) {
             count += groundtruth_data[i].count(x);
         }
-        count /= k;
+        count /= kNN;
         result += count;
     }
     auto end = std::chrono::steady_clock::now();
@@ -109,44 +93,21 @@ void Benchmark() {
     in_data.close();
 
     std::ifstream file_data_pq(
-        std::string("datasets/") + dataset_name + std::string("/data_pq_16p_8b.bin"),
-        std::ios::binary);
+        std::string("datasets/") + dataset_name + std::string("/data_pq16.bin"), std::ios::binary);
     std::ifstream file_centroids(
-        std::string("datasets/") + dataset_name + std::string("/centroids_16p_8b.bin"),
+        std::string("datasets/") + dataset_name + std::string("/centroids16.bin"),
         std::ios::binary);
     hnsw.LoadQuantization(file_data_pq, file_centroids);
     file_data_pq.close();
     file_centroids.close();
 
-    // hnsw.FillTable(hnsw.data);
-
-    // std::cout << std::setprecision(4) << std::fixed;
-
-    // for (int i = 0; i < 8; ++i) {
-    //     std::cout << hnsw.GetDistance(i) << "\n";
-    // }
-
-    // std::cout << std::setprecision(4) << std::fixed;
-    // for (int i = 0; i < SUBSPACES; ++i){
-    //     for (int code = 0; code < 256; ++code){
-    //         std::cout << hnsw.pqtable[i][code] << " ";
-    //     }
-    //     std::cout << "\n";
-    // }
-
-    // if (dataset_name == "glove") {
-    //     for (int i = 0; i < 1183514; ++i) {
-    //         Normalize(hnsw.data + i * SIZE);
-    //     }
-    // }
-
     ReadData();
 
     std::cout << "WARMUP\n";
     std::ofstream trash(std::string("logs/") + dataset_name + std::string("/base.txt"));
-    for (int i = 1000; i <= 1000; i += 10) {
+    for (int i = 100; i <= 300; i += 100) {
         std::cout << i << "\n";
-        evaluate(trash, hnsw, i, 10);
+        evaluate(trash, hnsw, i);
     }
     trash.close();
 
@@ -174,12 +135,6 @@ void Reorder() {
     HNSW<SPACE> hnsw(in, in_data);
     in.close();
     in_data.close();
-
-    // if (dataset_name == "glove") {
-    //     for (int i = 0; i < 1183514; ++i) {
-    //         Normalize(hnsw.data_long_ + i * SIZE);
-    //     }
-    // }
 
     hnsw.ReOrdering();
 
@@ -218,9 +173,6 @@ void Create() {
     FloatType el = 1.0 / std::log(1.0 * M);
     HNSW<SPACE> hnsw(M, efConstruction, n, in);
     in.close();
-    // if (dataset_name == "glove") {
-    //     NormalizeGlove(&(hnsw.data_long_[0]));
-    // }
     for (int i = 0; i < n; ++i) {
         if (i % 1000 == 0) {
             std::cout << i << "\n";

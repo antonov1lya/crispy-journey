@@ -60,6 +60,7 @@ struct SpaceL2 {
 
 struct SpaceCosine {
     FloatType Distance(FloatType* x, FloatType* y) {
+        // NOTE: works only with normalized vectors
         ++computations_;
         FloatType distance = 0;
         for (IntType i = 0; i < SIZE; ++i) {
