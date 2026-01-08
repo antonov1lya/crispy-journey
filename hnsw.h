@@ -246,9 +246,6 @@ inline std::vector<IntType> HNSW<Space>::SelectNeighboursSSG(IntType node, Queue
     std::vector<Point> dir;
     dir.reserve(M + 1);
     for (IntType element : queue) {
-        if (element == node) {
-            continue;
-        }
         if (selected.size() >= M) {
             break;
         }
@@ -275,11 +272,12 @@ inline std::vector<IntType> HNSW<Space>::SSGAdapter(IntType node,
     std::sort(candidates.begin(), candidates.end());
     candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
     QueueLess candidates_queue;
-    for (IntType neighbor : candidates) {
+    for (IntType neighbour : candidates) {
         candidates_queue.emplace(
-            space_.Distance(&(data_long_[node * SIZE]), &(data_long_[neighbor * SIZE])), neighbor);
+            space_.Distance(&(data_long_[node * SIZE]), &(data_long_[neighbour * SIZE])),
+            neighbour);
     }
-    return SelectNeighboursSSG(node, candidates_queue, 50, maxM_);
+    return SelectNeighboursSSG(node, candidates_queue, M_, maxM_);
 }
 
 template <typename Space>
@@ -306,23 +304,39 @@ inline void HNSW<Space>::ImproveSSG() {
             ne[node] = SSGAdapter(node, candidates);
         }
     }
-    for (IntType node = 0; node < size_; ++node) {
-        graph_[node].neighbors_[0] = ne[node];
-    }
     std::cout << "SECOND STAGE\n";
+    std::vector<std::vector<IntType>> ne2(size_);
+    for (IntType node = 0; node < size_; ++node) {
+        for (IntType next : ne[node]) {
+            ne2[node].push_back(next);
+            ne2[next].push_back(node);
+        }
+    }
+    std::cout << "THIRD STAGE\n";
     for (IntType node = 0; node < size_; ++node) {
         if (node % 10000 == 0) {
             std::cout << node << "\n";
         }
-        for (IntType level = 0; level < 1; ++level) {
-            for (IntType x : graph_[node].neighbors_[level]) {
-                if (node != x) {
-                    graph_[x].neighbors_[level].push_back(node);
-                    graph_[x].neighbors_[level] = SSGAdapter(node, graph_[x].neighbors_[level]);
-                }
-            }
-        }
+        graph_[node].neighbors_[0] = SSGAdapter(node, ne2[node]);
     }
+
+    // for (IntType node = 0; node < size_; ++node) {
+    //     graph_[node].neighbors_[0] = ne[node];
+    // }
+    // std::cout << "SECOND STAGE\n";
+    // for (IntType node = 0; node < size_; ++node) {
+    //     if (node % 10000 == 0) {
+    //         std::cout << node << "\n";
+    //     }
+    //     for (IntType level = 0; level < 1; ++level) {
+    //         for (IntType x : graph_[node].neighbors_[level]) {
+    //             if (node != x) {
+    //                 graph_[x].neighbors_[level].push_back(node);
+    //                 graph_[x].neighbors_[level] = SSGAdapter(node, graph_[x].neighbors_[level]);
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 template <typename Space>
@@ -667,13 +681,6 @@ inline HNSW<Space>::HNSW(std::ifstream& file, std::ifstream& file_data) {
         ReadBinaryInt(reorder_to_new_[i]);
     }
     data_long_ = static_cast<FloatType*>(aligned_alloc(ALIGN64, (size_ * dim) * sizeof(FloatType)));
-    // for (IntType node = 0; node < size_; ++node) {
-    //     for (IntType i = 0; i < dim; ++i) {
-    //         FloatType x;
-    //         file_data >> x;
-    //         data_long_[reorder_to_new_[node] * SIZE + i] = x;
-    //     }
-    // }
     auto ReadBinaryFloat = [&file_data](FloatType& value) {
         file_data.read(reinterpret_cast<char*>(&value), sizeof(FloatType));
     };

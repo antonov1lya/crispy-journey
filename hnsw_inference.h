@@ -11,6 +11,8 @@ struct HNSWInference {
     ~HNSWInference() {
     }
     void LoadQuantization(std::ifstream& file_data_pq, std::ifstream& file_centroids);
+    void LoadQuantizationMatrix(std::ifstream& file_matrix);
+    void Transform(FloatType* query);
     void FillTable(FloatType* query);
     FloatType GetDistance(IntType node);
     QueueLess SearchLayer(FloatType* query, IntType enter_point, IntType ef, IntType level);
@@ -41,6 +43,9 @@ struct HNSWInference {
     uint8_t* quantized_data;
     FloatType* centroids;
     std::array<std::array<FloatType, 256>, SUBSPACES> pq_table;
+    FloatType* matrix;
+    FloatType* quantized_vector;
+    bool need_mm = false;
 };
 
 template <typename Space>
@@ -65,7 +70,28 @@ inline void HNSWInference<Space>::LoadQuantization(std::ifstream& file_data_pq,
 }
 
 template <typename Space>
+inline void HNSWInference<Space>::LoadQuantizationMatrix(std::ifstream& file_matrix) {
+    quantized_vector = (FloatType*)aligned_alloc(ALIGN64, SIZE * sizeof(FloatType));
+    matrix = (FloatType*)aligned_alloc(ALIGN64, SIZE * SIZE * sizeof(FloatType));
+    file_matrix.read(reinterpret_cast<char*>(matrix), SIZE * SIZE * sizeof(FloatType));
+    need_mm = true;
+}
+
+template <typename Space>
+inline void HNSWInference<Space>::Transform(FloatType* query) {
+    for (IntType i = 0; i < SIZE; ++i) {
+        for (IntType j = 0; j < SIZE; ++j) {
+            quantized_vector[i] += matrix[i * SIZE + j] * query[j];
+        }
+    }
+}
+
+template <typename Space>
 inline void HNSWInference<Space>::FillTable(FloatType* query) {
+    if (need_mm) {
+        Transform(query);
+        query = quantized_vector;
+    }
     FloatType* pointer = centroids;
     for (int i = 0; i < SUBSPACES; ++i) {
         FloatType* subquery = query + i * SUBSIZE;

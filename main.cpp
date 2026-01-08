@@ -84,7 +84,7 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
 }
 
 void Benchmark() {
-    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/prune_ssg.bin"),
+    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/base.bin"),
                      std::ios::binary);
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.bin"),
                           std::ios::binary);
@@ -92,20 +92,28 @@ void Benchmark() {
     in.close();
     in_data.close();
 
-    // std::ifstream file_data_pq(
-    //     std::string("datasets/") + dataset_name + std::string("/data_pq16.bin"),
-    //     std::ios::binary);
-    // std::ifstream file_centroids(
-    //     std::string("datasets/") + dataset_name + std::string("/centroids16.bin"),
-    //     std::ios::binary);
-    // hnsw.LoadQuantization(file_data_pq, file_centroids);
-    // file_data_pq.close();
-    // file_centroids.close();
+    std::ifstream file_data_pq(
+        std::string("datasets/") + dataset_name + std::string("/data_pq16.bin"), std::ios::binary);
+    std::ifstream file_centroids(
+        std::string("datasets/") + dataset_name + std::string("/centroids16.bin"),
+        std::ios::binary);
+    std::ifstream file_matrix(std::string("datasets/") + dataset_name + std::string("/matrix.bin"),
+                              std::ios::binary);
+    hnsw.LoadQuantization(file_data_pq, file_centroids);
+    hnsw.LoadQuantizationMatrix(file_matrix);
+    file_data_pq.close();
+    file_centroids.close();
+    file_matrix.close();
+
+    hnsw.FillTable(hnsw.data);
+    for (int i = 0; i < 16; i++) {
+        std::cout << hnsw.GetDistance(i) << "\n";
+    }
 
     ReadData();
 
     std::cout << "WARMUP\n";
-    std::ofstream trash(std::string("logs/") + dataset_name + std::string("/base.txt"));
+    std::ofstream trash(std::string("logs/") + dataset_name + std::string("/ssg25.txt"));
     for (int i = 100; i <= 100; i += 100) {
         std::cout << i << "\n";
         evaluate(trash, hnsw, i);
@@ -154,11 +162,11 @@ void SSG() {
     in.close();
     in_data.close();
 
-    for (IntType _ = 0; _ < 1; ++_) {
+    for (IntType _ = 0; _ < 5; ++_) {
         hnsw.ImproveSSG();
     }
 
-    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/prune_ssg.bin"),
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/ssg25.bin"),
                       std::ios::binary);
     hnsw.Save(out);
     out.close();
