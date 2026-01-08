@@ -68,6 +68,9 @@ struct SpaceCosine {
         }
         return 1 - distance;
     }
+    FloatType DistanceSubspace(FloatType* x, FloatType* y) {
+        return 0;
+    }
     IntType GetComputationsNumber() {
         return computations_;
     }
@@ -77,13 +80,31 @@ struct SpaceCosine {
     IntType computations_ = 0;
 };
 
-void Normalize(FloatType* x) {
-    FloatType norm = 0;
-    for (IntType i = 0; i < SIZE; ++i) {
-        norm += x[i] * x[i];
+struct Point {
+    std::vector<FloatType> data;
+    void Normalize() {
+        FloatType norm = 0;
+        for (IntType i = 0; i < SIZE; ++i) {
+            norm += data[i] * data[i];
+        }
+        norm = std::sqrt(norm);
+        for (IntType i = 0; i < SIZE; ++i) {
+            data[i] /= norm;
+        }
     }
-    norm = std::sqrt(norm);
-    for (IntType i = 0; i < SIZE; ++i) {
-        x[i] /= norm;
+    Point(FloatType* start, FloatType* end) {
+        data.resize(SIZE);
+        for (IntType i = 0; i < SIZE; ++i) {
+            data[i] = end[i] - start[i];
+        }
+        Normalize();
     }
+};
+
+FloatType CalcCos(const Point x, const Point& y) {
+    FloatType distance = 0;
+    for (IntType i = 0; i < SIZE; ++i) {
+        distance += x.data[i] * y.data[i];
+    }
+    return distance;
 }

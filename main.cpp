@@ -15,7 +15,7 @@
 // std::string dataset_name = "fashion_mnist";
 // std::string dataset_name = "gist";
 std::string dataset_name = "sift1m";
-// std::string dataset_name = "glove";
+// std::string dataset_name = "glove100";
 
 std::mt19937 gen(0);
 
@@ -67,7 +67,7 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
     hnsw.space_.FlushComputationsNumber();
     auto begin = std::chrono::steady_clock::now();
     for (int i = 0; i < n; ++i) {
-        auto res = hnsw.SearchPQ(&query_data[i * SIZE], kNN, ef);
+        auto res = hnsw.Search(&query_data[i * SIZE], kNN, ef);
         double count = 0;
         for (auto x : res) {
             count += groundtruth_data[i].count(x);
@@ -84,7 +84,7 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
 }
 
 void Benchmark() {
-    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/local_search.bin"),
+    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/prune_ssg.bin"),
                      std::ios::binary);
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.bin"),
                           std::ios::binary);
@@ -92,20 +92,21 @@ void Benchmark() {
     in.close();
     in_data.close();
 
-    std::ifstream file_data_pq(
-        std::string("datasets/") + dataset_name + std::string("/data_pq16.bin"), std::ios::binary);
-    std::ifstream file_centroids(
-        std::string("datasets/") + dataset_name + std::string("/centroids16.bin"),
-        std::ios::binary);
-    hnsw.LoadQuantization(file_data_pq, file_centroids);
-    file_data_pq.close();
-    file_centroids.close();
+    // std::ifstream file_data_pq(
+    //     std::string("datasets/") + dataset_name + std::string("/data_pq16.bin"),
+    //     std::ios::binary);
+    // std::ifstream file_centroids(
+    //     std::string("datasets/") + dataset_name + std::string("/centroids16.bin"),
+    //     std::ios::binary);
+    // hnsw.LoadQuantization(file_data_pq, file_centroids);
+    // file_data_pq.close();
+    // file_centroids.close();
 
     ReadData();
 
     std::cout << "WARMUP\n";
     std::ofstream trash(std::string("logs/") + dataset_name + std::string("/base.txt"));
-    for (int i = 100; i <= 300; i += 100) {
+    for (int i = 100; i <= 100; i += 100) {
         std::cout << i << "\n";
         evaluate(trash, hnsw, i);
     }
@@ -144,6 +145,25 @@ void Reorder() {
     out.close();
 }
 
+void SSG() {
+    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/base.bin"),
+                     std::ios::binary);
+    std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.bin"),
+                          std::ios::binary);
+    HNSW<SPACE> hnsw(in, in_data);
+    in.close();
+    in_data.close();
+
+    for (IntType _ = 0; _ < 1; ++_) {
+        hnsw.ImproveSSG();
+    }
+
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/prune_ssg.bin"),
+                      std::ios::binary);
+    hnsw.Save(out);
+    out.close();
+}
+
 void Create() {
     std::ifstream in(std::string("datasets/") + dataset_name + std::string("/data.bin"),
                      std::ios::binary);
@@ -160,7 +180,7 @@ void Create() {
         efConstruction = 128;
         n = 1000000;
     }
-    if (dataset_name == "glove") {
+    if (dataset_name == "glove100") {
         M = 25;
         efConstruction = 2500;
         n = 1183514;
@@ -180,7 +200,7 @@ void Create() {
         FloatType level = -std::log(dist(gen)) * el;
         hnsw.Add(level);
     }
-    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/base.bin"),
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/ssg.bin"),
                       std::ios::binary);
     hnsw.Save(out);
     out.close();
@@ -193,6 +213,7 @@ int main() {
     // Reorder();
     // PrintGraph();
     // ReadReorder();
+    // SSG();
 
     return 0;
 }
