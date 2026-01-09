@@ -9,16 +9,9 @@
 #include "hnsw_inference.h"
 #include "primitives.h"
 
-// #define SPACE SpaceCosine
-#define SPACE SpaceL2
-
-// std::string dataset_name = "fashion_mnist";
-// std::string dataset_name = "gist";
-std::string dataset_name = "sift1m";
-// std::string dataset_name = "glove100";
+std::string dataset_name = DATASET;
 
 std::mt19937 gen(0);
-
 std::uniform_real_distribution<FloatType> dist(0, 1);
 
 FloatType* query_data;
@@ -67,7 +60,7 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
     hnsw.space_.FlushComputationsNumber();
     auto begin = std::chrono::steady_clock::now();
     for (int i = 0; i < n; ++i) {
-        auto res = hnsw.SearchPQ(&query_data[i * SIZE], kNN, ef);
+        auto res = hnsw.Search(&query_data[i * SIZE], kNN, ef);
         double count = 0;
         for (auto x : res) {
             count += groundtruth_data[i].count(x);
@@ -108,27 +101,12 @@ void Benchmark() {
     ReadData();
 
     std::cout << "WARMUP\n";
-    std::ofstream trash(std::string("logs/") + dataset_name + std::string("/test.txt"));
-    for (int i = 1100; i <= 1100; i += 1100) {
+    std::ofstream print(std::string("logs/") + dataset_name + std::string("/no.txt"));
+    for (int i = 100; i <= 500; i += 100) {
         std::cout << i << "\n";
-        evaluate(trash, hnsw, i);
+        evaluate(print, hnsw, i);
     }
-    trash.close();
-
-    // k=10
-    // sift 30,100,10
-    // glove 200,1500,100
-
-    // std::cout << "START\n";
-    // std::ofstream print("bench/sift/mst.txt");
-    // {
-    //     for (int j = 0; j < 5; j++)
-    //         for (int i = 30; i <= 100; i += 10) {
-    //             std::cout << i << " " << j << "\n";
-    //             evaluate(print, hnsw, i, 10);
-    //         }
-    //     print << "NEXT\n";
-    // }
+    print.close();
 }
 
 void Reorder() {
@@ -177,10 +155,8 @@ void Create() {
         n = 60000;
     }
     if (dataset_name == "sift1m") {
-        // M = 25;
-        // efConstruction = 600;
-        M = 16;
-        efConstruction = 128;
+        M = 25;
+        efConstruction = 600;
         n = 1000000;
     }
     if (dataset_name == "glove100") {

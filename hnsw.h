@@ -38,16 +38,6 @@ struct HNSW {
         }
         file_data.read(reinterpret_cast<char*>(data_long_),
                        sizeof(FloatType) * max_elements * SIZE);
-        // auto ReadBinaryFloat = [&file_data](FloatType& value) {
-        //     file_data.read(reinterpret_cast<char*>(&value), sizeof(FloatType));
-        // };
-        // for (IntType node = 0; node < max_elements; ++node) {
-        //     for (IntType i = 0; i < SIZE; ++i) {
-        //         FloatType x;
-        //         file_data >> x;
-        //         data_long_[reorder_to_new_[node] * SIZE + i] = x;
-        //     }
-        // }
     }
     HNSW(std::ifstream& file, std::ifstream& file_data);
     ~HNSW() {

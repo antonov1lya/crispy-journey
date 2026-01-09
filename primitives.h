@@ -4,32 +4,17 @@
 #include <queue>
 #include <vector>
 
-typedef float FloatType;
-typedef int IntType;
+#include "config.h"
 
-typedef std::priority_queue<std::pair<FloatType, IntType>,
-                            std::vector<std::pair<FloatType, IntType>>,
-                            std::less<std::pair<FloatType, IntType>>>
-    QueueLess;
+using FloatType = float;
+using IntType = int;
 
-typedef std::priority_queue<std::pair<FloatType, IntType>,
-                            std::vector<std::pair<FloatType, IntType>>,
-                            std::greater<std::pair<FloatType, IntType>>>
-    QueueGreater;
-
-#define REORDER
-
-#define ALIGN64 64
-#define ALIGN4 4
-
-#define SIZE 128
-// #define SIZE 960
-// #define SIZE 784
-// #define SIZE 100
-
-#define SUBSPACES 16
-#define SUBSIZE 8
-#define BITS 256
+using QueueLess =
+    std::priority_queue<std::pair<FloatType, IntType>, std::vector<std::pair<FloatType, IntType>>,
+                        std::less<std::pair<FloatType, IntType>>>;
+using QueueGreater =
+    std::priority_queue<std::pair<FloatType, IntType>, std::vector<std::pair<FloatType, IntType>>,
+                        std::greater<std::pair<FloatType, IntType>>>;
 
 struct SpaceL2 {
     FloatType Distance(FloatType* x, FloatType* y) {
