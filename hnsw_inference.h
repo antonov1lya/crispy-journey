@@ -79,6 +79,7 @@ inline void HNSWInference<Space>::LoadQuantizationMatrix(std::ifstream& file_mat
 
 template <typename Space>
 inline void HNSWInference<Space>::Transform(FloatType* query) {
+    memset(quantized_vector, 0, SIZE * sizeof(FloatType));
     for (IntType i = 0; i < SIZE; ++i) {
         for (IntType j = 0; j < SIZE; ++j) {
             quantized_vector[i] += matrix[i * SIZE + j] * query[j];

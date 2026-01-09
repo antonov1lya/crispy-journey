@@ -67,7 +67,7 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
     hnsw.space_.FlushComputationsNumber();
     auto begin = std::chrono::steady_clock::now();
     for (int i = 0; i < n; ++i) {
-        auto res = hnsw.Search(&query_data[i * SIZE], kNN, ef);
+        auto res = hnsw.SearchPQ(&query_data[i * SIZE], kNN, ef);
         double count = 0;
         for (auto x : res) {
             count += groundtruth_data[i].count(x);
@@ -105,16 +105,11 @@ void Benchmark() {
     file_centroids.close();
     file_matrix.close();
 
-    hnsw.FillTable(hnsw.data);
-    for (int i = 0; i < 16; i++) {
-        std::cout << hnsw.GetDistance(i) << "\n";
-    }
-
     ReadData();
 
     std::cout << "WARMUP\n";
-    std::ofstream trash(std::string("logs/") + dataset_name + std::string("/ssg25.txt"));
-    for (int i = 100; i <= 100; i += 100) {
+    std::ofstream trash(std::string("logs/") + dataset_name + std::string("/test.txt"));
+    for (int i = 1100; i <= 1100; i += 1100) {
         std::cout << i << "\n";
         evaluate(trash, hnsw, i);
     }
