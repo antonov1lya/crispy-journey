@@ -214,16 +214,16 @@ template <typename Space>
 inline std::vector<IntType> HNSW<Space>::SelectNeighboursSSG(IntType node, QueueLess& candidates,
                                                              IntType M, IntType maxM) {
     const FloatType ssg_cos = 0.5;
-    if (candidates.size() < M) {
-        std::vector<IntType> array;
-        array.reserve(maxM + 1);
-        while (!candidates.empty()) {
-            array.push_back(candidates.top().second);
-            candidates.pop();
-        }
-        std::reverse(array.begin(), array.end());
-        return array;
-    }
+    // if (candidates.size() < M) {
+    //     std::vector<IntType> array;
+    //     array.reserve(maxM + 1);
+    //     while (!candidates.empty()) {
+    //         array.push_back(candidates.top().second);
+    //         candidates.pop();
+    //     }
+    //     std::reverse(array.begin(), array.end());
+    //     return array;
+    // }
     std::vector<IntType> queue;
     queue.reserve(candidates.size());
     while (!candidates.empty()) {
@@ -267,7 +267,7 @@ inline std::vector<IntType> HNSW<Space>::SSGAdapter(IntType node,
             space_.Distance(&(data_long_[node * SIZE]), &(data_long_[neighbour * SIZE])),
             neighbour);
     }
-    return SelectNeighboursSSG(node, candidates_queue, M_, maxM_);
+    return SelectNeighboursSSG(node, candidates_queue, maxM_, maxM_);
 }
 
 template <typename Space>
@@ -537,9 +537,9 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
 
 template <typename Space>
 inline void HNSW<Space>::ReOrdering() {
-    SumOfModulesReOrdering();
+    // SumOfModulesReOrdering();
     // BFSReOrdering();
-    // MSTReOrdering();
+    MSTReOrdering();
     GraphReWrite();
 }
 

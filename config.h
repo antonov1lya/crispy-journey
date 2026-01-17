@@ -1,12 +1,14 @@
 #pragma once
 
-#define SIFT1M
+// #define SIFT1M
 // #define GLOVE100
+#define GIST1M
 
 #define REORDER
 
-#define SUBSPACES 16
-#define SUBSIZE 8
+#define SUBSPACES 32
+// #define SUBSIZE 8
+#define SUBSIZE 30
 #define BITS 256
 
 #define ALIGN64 64
@@ -22,4 +24,10 @@
 #define DATASET "glove100"
 #define SIZE 100
 #define SPACE SpaceCosine
+#endif
+
+#ifdef GIST1M
+#define DATASET "gist1m"
+#define SIZE 960
+#define SPACE SpaceL2
 #endif

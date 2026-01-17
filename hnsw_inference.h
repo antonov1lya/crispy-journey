@@ -5,6 +5,15 @@
 
 #include "primitives.h"
 
+void* HugeAlloc(size_t total_size_bytes) {
+    size_t hugepage_size = 2 * 1024 * 1024;
+    size_t size = (total_size_bytes + hugepage_size - 1) & ~(hugepage_size - 1);
+    void* ptr =
+        mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, -1, 0);
+    std::cout << ptr << "\n";
+    return ptr;
+}
+
 template <typename Space>
 struct HNSWInference {
     HNSWInference(std::ifstream& file, std::ifstream& file_data);
@@ -55,7 +64,8 @@ inline void HNSWInference<Space>::LoadQuantization(std::ifstream& file_data_pq,
         file_data_pq.read(reinterpret_cast<char*>(&value), sizeof(uint8_t));
     };
 
-    quantized_data = (uint8_t*)aligned_alloc(ALIGN64, SUBSPACES * size_ * sizeof(uint8_t));
+    // quantized_data = (uint8_t*)aligned_alloc(ALIGN64, SUBSPACES * size_ * sizeof(uint8_t));
+    quantized_data = (uint8_t*)HugeAlloc(SUBSPACES * size_ * sizeof(uint8_t));
 
     for (IntType node = 0; node < size_; ++node) {
         uint8_t* pointer = (uint8_t*)(quantized_data + reorder_to_new_[node] * SUBSPACES);
@@ -287,14 +297,6 @@ inline std::vector<IntType> HNSWInference<Space>::SearchPQ(FloatType* query, Int
     return array;
 }
 
-FloatType* HugeAlloc(size_t total_size_bytes) {
-    size_t hugepage_size = 2 * 1024 * 1024;
-    size_t size = (total_size_bytes + hugepage_size - 1) & ~(hugepage_size - 1);
-    void* ptr =
-        mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, -1, 0);
-    return (FloatType*)ptr;
-}
-
 template <typename Space>
 inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& file_data) {
     auto ReadBinaryInt = [&file](IntType& value) {
@@ -314,7 +316,7 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
     was_ = (IntType*)aligned_alloc(ALIGN64, size_ * sizeof(IntType));
     memset(was_, 0, size_ * sizeof(int));
 
-    data = HugeAlloc(size_ * SIZE * sizeof(FloatType));
+    data = (FloatType*)HugeAlloc(size_ * SIZE * sizeof(FloatType));
 
     list = (IntType**)(aligned_alloc(ALIGN64, size_ * sizeof(IntType*)));
     list0 = (IntType*)(aligned_alloc(ALIGN64, size_ * (maxM0_ + 1) * sizeof(IntType)));

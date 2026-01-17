@@ -53,14 +53,14 @@ void ReadData() {
 
 void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
     int n = 10000;
-    if (dataset_name == "gist") {
+    if (dataset_name == "gist1m") {
         n = 1000;
     }
     double result = 0;
     hnsw.space_.FlushComputationsNumber();
     auto begin = std::chrono::steady_clock::now();
     for (int i = 0; i < n; ++i) {
-        auto res = hnsw.Search(&query_data[i * SIZE], kNN, ef);
+        auto res = hnsw.SearchPQ(&query_data[i * SIZE], kNN, ef);
         double count = 0;
         for (auto x : res) {
             count += groundtruth_data[i].count(x);
@@ -77,7 +77,7 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
 }
 
 void Benchmark() {
-    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/base.bin"),
+    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/reordering.bin"),
                      std::ios::binary);
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.bin"),
                           std::ios::binary);
@@ -86,11 +86,11 @@ void Benchmark() {
     in_data.close();
 
     std::ifstream file_data_pq(
-        std::string("datasets/") + dataset_name + std::string("/data_pq16.bin"), std::ios::binary);
+        std::string("datasets/") + dataset_name + std::string("/data_pq32.bin"), std::ios::binary);
     std::ifstream file_centroids(
-        std::string("datasets/") + dataset_name + std::string("/centroids16.bin"),
+        std::string("datasets/") + dataset_name + std::string("/centroids32.bin"),
         std::ios::binary);
-    std::ifstream file_matrix(std::string("datasets/") + dataset_name + std::string("/matrix.bin"),
+    std::ifstream file_matrix(std::string("datasets/") + dataset_name + std::string("/matrix32.bin"),
                               std::ios::binary);
     hnsw.LoadQuantization(file_data_pq, file_centroids);
     hnsw.LoadQuantizationMatrix(file_matrix);
@@ -101,8 +101,8 @@ void Benchmark() {
     ReadData();
 
     std::cout << "WARMUP\n";
-    std::ofstream print(std::string("logs/") + dataset_name + std::string("/no.txt"));
-    for (int i = 100; i <= 500; i += 100) {
+    std::ofstream print(std::string("logs/") + dataset_name + std::string("/reordering.txt"));
+    for (int i = 2000; i <= 2000; i += 1000) {
         std::cout << i << "\n";
         evaluate(print, hnsw, i);
     }
@@ -120,14 +120,14 @@ void Reorder() {
 
     hnsw.ReOrdering();
 
-    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/annealing.bin"),
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/reordering.bin"),
                       std::ios::binary);
     hnsw.Save(out);
     out.close();
 }
 
 void SSG() {
-    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/base.bin"),
+    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/classic.bin"),
                      std::ios::binary);
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.bin"),
                           std::ios::binary);
@@ -139,7 +139,7 @@ void SSG() {
         hnsw.ImproveSSG();
     }
 
-    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/ssg25.bin"),
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/ssg_classic.bin"),
                       std::ios::binary);
     hnsw.Save(out);
     out.close();
@@ -164,7 +164,7 @@ void Create() {
         efConstruction = 2500;
         n = 1183514;
     }
-    if (dataset_name == "gist") {
+    if (dataset_name == "gist1m") {
         M = 35;
         efConstruction = 800;
         n = 1000000;
@@ -179,7 +179,7 @@ void Create() {
         FloatType level = -std::log(dist(gen)) * el;
         hnsw.Add(level);
     }
-    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/ssg.bin"),
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/base.bin"),
                       std::ios::binary);
     hnsw.Save(out);
     out.close();
