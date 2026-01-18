@@ -19,9 +19,10 @@ struct HNSWInference {
     HNSWInference(std::ifstream& file, std::ifstream& file_data);
     ~HNSWInference() {
     }
-    void LoadQuantization(std::ifstream& file_data_pq, std::ifstream& file_centroids);
-    void LoadQuantizationMatrix(std::ifstream& file_matrix);
-    void Transform(FloatType* query);
+    void LoadPQ(std::ifstream& file_data_pq, std::ifstream& file_centroids);
+    void LoadPQMatrix(std::ifstream& file_matrix);
+    void LoadReRankMatrix(std::ifstream& file_matrix);
+    // void Transform(FloatType* query);
     void FillTable(FloatType* query);
     FloatType GetDistance(IntType node);
     QueueLess SearchLayer(FloatType* query, IntType enter_point, IntType ef, IntType level);
@@ -52,14 +53,17 @@ struct HNSWInference {
     uint8_t* quantized_data;
     FloatType* centroids;
     std::array<std::array<FloatType, 256>, SUBSPACES> pq_table;
-    FloatType* matrix;
-    FloatType* quantized_vector;
-    bool need_mm = false;
+    FloatType* matrix_PQ;
+    FloatType* vector_PQ;
+    bool need_mm_PQ = false;
+    FloatType* matrix_rerank;
+    FloatType* vector_rerank;
+    bool need_mm_rerank = false;
 };
 
 template <typename Space>
-inline void HNSWInference<Space>::LoadQuantization(std::ifstream& file_data_pq,
-                                                   std::ifstream& file_centroids) {
+inline void HNSWInference<Space>::LoadPQ(std::ifstream& file_data_pq,
+                                         std::ifstream& file_centroids) {
     auto ReadBinaryUInt8 = [&file_data_pq](uint8_t& value) {
         file_data_pq.read(reinterpret_cast<char*>(&value), sizeof(uint8_t));
     };
@@ -80,28 +84,37 @@ inline void HNSWInference<Space>::LoadQuantization(std::ifstream& file_data_pq,
 }
 
 template <typename Space>
-inline void HNSWInference<Space>::LoadQuantizationMatrix(std::ifstream& file_matrix) {
-    quantized_vector = (FloatType*)aligned_alloc(ALIGN64, SIZE * sizeof(FloatType));
-    matrix = (FloatType*)aligned_alloc(ALIGN64, SIZE * SIZE * sizeof(FloatType));
-    file_matrix.read(reinterpret_cast<char*>(matrix), SIZE * SIZE * sizeof(FloatType));
-    need_mm = true;
+inline void HNSWInference<Space>::LoadPQMatrix(std::ifstream& file_matrix) {
+    vector_PQ = (FloatType*)aligned_alloc(ALIGN64, SIZE * sizeof(FloatType));
+    matrix_PQ = (FloatType*)aligned_alloc(ALIGN64, SIZE * SIZE * sizeof(FloatType));
+    file_matrix.read(reinterpret_cast<char*>(matrix_PQ), SIZE * SIZE * sizeof(FloatType));
+    need_mm_PQ = true;
 }
 
 template <typename Space>
-inline void HNSWInference<Space>::Transform(FloatType* query) {
-    memset(quantized_vector, 0, SIZE * sizeof(FloatType));
-    for (IntType i = 0; i < SIZE; ++i) {
-        for (IntType j = 0; j < SIZE; ++j) {
-            quantized_vector[i] += matrix[i * SIZE + j] * query[j];
-        }
-    }
+inline void HNSWInference<Space>::LoadReRankMatrix(std::ifstream& file_matrix) {
+    vector_rerank = (FloatType*)aligned_alloc(ALIGN64, SIZE * sizeof(FloatType));
+    matrix_rerank = (FloatType*)aligned_alloc(ALIGN64, SIZE * SIZE * sizeof(FloatType));
+    file_matrix.read(reinterpret_cast<char*>(matrix_rerank), SIZE * SIZE * sizeof(FloatType));
+    need_mm_rerank = true;
 }
+
+// template <typename Space>
+// inline void HNSWInference<Space>::Transform(FloatType* query) {
+//     memset(quantized_vector, 0, SIZE * sizeof(FloatType));
+//     for (IntType i = 0; i < SIZE; ++i) {
+//         for (IntType j = 0; j < SIZE; ++j) {
+//             quantized_vector[i] += matrix[i * SIZE + j] * query[j];
+//         }
+//     }
+// }
 
 template <typename Space>
 inline void HNSWInference<Space>::FillTable(FloatType* query) {
-    if (need_mm) {
-        Transform(query);
-        query = quantized_vector;
+    if (need_mm_PQ) {
+        // Transform(query);
+        MatVecMul(matrix_PQ, query, vector_PQ);
+        query = vector_PQ;
     }
     FloatType* pointer = centroids;
     for (int i = 0; i < SUBSPACES; ++i) {
@@ -279,6 +292,10 @@ inline std::vector<IntType> HNSWInference<Space>::SearchPQ(FloatType* query, Int
         enter_point = SearchLayerPQ(query, enter_point, 1, i).top().second;
     }
     auto nearest_neighbours = SearchLayerPQ(query, enter_point, ef, 0);
+    if (need_mm_rerank) {
+        MatVecMul(matrix_rerank, query, vector_rerank);
+        query = vector_rerank;
+    }
     std::vector<std::pair<FloatType, IntType>> candidates;
     candidates.reserve(nearest_neighbours.size());
     while (!nearest_neighbours.empty()) {

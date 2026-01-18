@@ -77,7 +77,7 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
 }
 
 void Benchmark() {
-    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/reordering.bin"),
+    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/base.bin"),
                      std::ios::binary);
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.bin"),
                           std::ios::binary);
@@ -86,23 +86,29 @@ void Benchmark() {
     in_data.close();
 
     std::ifstream file_data_pq(
-        std::string("datasets/") + dataset_name + std::string("/data_pq32.bin"), std::ios::binary);
+        std::string("datasets/") + dataset_name + std::string("/data_pq16.bin"), std::ios::binary);
     std::ifstream file_centroids(
-        std::string("datasets/") + dataset_name + std::string("/centroids32.bin"),
+        std::string("datasets/") + dataset_name + std::string("/centroids16.bin"),
         std::ios::binary);
-    std::ifstream file_matrix(std::string("datasets/") + dataset_name + std::string("/matrix32.bin"),
-                              std::ios::binary);
-    hnsw.LoadQuantization(file_data_pq, file_centroids);
-    hnsw.LoadQuantizationMatrix(file_matrix);
+    std::ifstream file_matrix(
+        std::string("datasets/") + dataset_name + std::string("/matrix16.bin"), std::ios::binary);
+    hnsw.LoadPQ(file_data_pq, file_centroids);
+    hnsw.LoadPQMatrix(file_matrix);
     file_data_pq.close();
     file_centroids.close();
     file_matrix.close();
 
+    // std::ifstream file_matrix_rerank(
+    //     std::string("datasets/") + dataset_name + std::string("/rerank_matrix.bin"),
+    //     std::ios::binary);
+    // hnsw.LoadReRankMatrix(file_matrix_rerank);
+    // file_matrix_rerank.close();
+
     ReadData();
 
     std::cout << "WARMUP\n";
-    std::ofstream print(std::string("logs/") + dataset_name + std::string("/reordering.txt"));
-    for (int i = 2000; i <= 2000; i += 1000) {
+    std::ofstream print(std::string("logs/") + dataset_name + std::string("/after.txt"));
+    for (int i = 1900; i <= 1900; i += 1000) {
         std::cout << i << "\n";
         evaluate(print, hnsw, i);
     }
@@ -120,7 +126,7 @@ void Reorder() {
 
     hnsw.ReOrdering();
 
-    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/reordering.bin"),
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/reordering_bfs.bin"),
                       std::ios::binary);
     hnsw.Save(out);
     out.close();

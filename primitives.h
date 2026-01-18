@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string.h>
+
 #include <cmath>
 #include <queue>
 #include <vector>
@@ -17,7 +19,7 @@ using QueueGreater =
                         std::greater<std::pair<FloatType, IntType>>>;
 
 struct SpaceL2 {
-    FloatType Distance(FloatType* x, FloatType* y) {
+    FloatType Distance(const FloatType* x, const FloatType* y) {
         ++computations_;
         FloatType distance = 0;
         for (IntType i = 0; i < SIZE; ++i) {
@@ -26,7 +28,7 @@ struct SpaceL2 {
         }
         return distance;
     }
-    FloatType DistanceSubspace(FloatType* x, FloatType* y) {
+    FloatType DistanceSubspace(const FloatType* x, const FloatType* y) {
         FloatType distance = 0;
         for (IntType i = 0; i < SUBSIZE; ++i) {
             FloatType diff = x[i] - y[i];
@@ -44,7 +46,7 @@ struct SpaceL2 {
 };
 
 struct SpaceCosine {
-    FloatType Distance(FloatType* x, FloatType* y) {
+    FloatType Distance(const FloatType* x, const FloatType* y) {
         // NOTE: works only with normalized vectors
         ++computations_;
         FloatType distance = 0;
@@ -92,4 +94,16 @@ FloatType CalcCos(const Point x, const Point& y) {
         distance += x.data[i] * y.data[i];
     }
     return distance;
+}
+
+void MatVecMul(const FloatType* __restrict matrix, const FloatType* __restrict vector,
+               FloatType* __restrict result) {
+    for (IntType i = 0; i < SIZE; ++i) {
+        const FloatType* row = matrix + i * SIZE;
+        FloatType sum = 0;
+        for (IntType j = 0; j < SIZE; ++j) {
+            sum += row[j] * vector[j];
+        }
+        result[i] = sum;
+    }
 }

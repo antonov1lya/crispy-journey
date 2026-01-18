@@ -6,9 +6,12 @@
 
 #define REORDER
 
-#define SUBSPACES 32
-// #define SUBSIZE 8
-#define SUBSIZE 30
+// #define SUBSPACES 32
+// #define SUBSIZE 30
+
+#define SUBSPACES 16
+#define SUBSIZE 60
+
 #define BITS 256
 
 #define ALIGN64 64
