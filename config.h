@@ -6,11 +6,11 @@
 
 #define REORDER
 
-// #define SUBSPACES 32
-// #define SUBSIZE 30
+#define SUBSPACES 32
+#define SUBSIZE 30
 
-#define SUBSPACES 16
-#define SUBSIZE 60
+// #define SUBSPACES 20
+// #define SUBSIZE 5
 
 #define BITS 256
 
@@ -26,7 +26,7 @@
 #ifdef GLOVE100
 #define DATASET "glove100"
 #define SIZE 100
-#define SPACE SpaceCosine
+#define SPACE SpaceL2
 #endif
 
 #ifdef GIST1M

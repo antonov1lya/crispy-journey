@@ -86,12 +86,12 @@ void Benchmark() {
     in_data.close();
 
     std::ifstream file_data_pq(
-        std::string("datasets/") + dataset_name + std::string("/data_pq16.bin"), std::ios::binary);
+        std::string("datasets/") + dataset_name + std::string("/data_pq32.bin"), std::ios::binary);
     std::ifstream file_centroids(
-        std::string("datasets/") + dataset_name + std::string("/centroids16.bin"),
+        std::string("datasets/") + dataset_name + std::string("/centroids32.bin"),
         std::ios::binary);
     std::ifstream file_matrix(
-        std::string("datasets/") + dataset_name + std::string("/matrix16.bin"), std::ios::binary);
+        std::string("datasets/") + dataset_name + std::string("/matrix32.bin"), std::ios::binary);
     hnsw.LoadPQ(file_data_pq, file_centroids);
     hnsw.LoadPQMatrix(file_matrix);
     file_data_pq.close();
@@ -107,8 +107,8 @@ void Benchmark() {
     ReadData();
 
     std::cout << "WARMUP\n";
-    std::ofstream print(std::string("logs/") + dataset_name + std::string("/after.txt"));
-    for (int i = 1900; i <= 1900; i += 1000) {
+    std::ofstream print(std::string("logs/") + dataset_name + std::string("/res.txt"));
+    for (int i = 650; i <= 650; i += 1000) {
         std::cout << i << "\n";
         evaluate(print, hnsw, i);
     }
