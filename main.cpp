@@ -60,7 +60,7 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
     hnsw.space_.FlushComputationsNumber();
     auto begin = std::chrono::steady_clock::now();
     for (int i = 0; i < n; ++i) {
-        auto res = hnsw.SearchPQ(&query_data[i * SIZE], kNN, ef);
+        auto res = hnsw.Search(&query_data[i * SIZE], kNN, ef);
         double count = 0;
         for (auto x : res) {
             count += groundtruth_data[i].count(x);
@@ -108,7 +108,7 @@ void Benchmark() {
 
     std::cout << "WARMUP\n";
     std::ofstream print(std::string("logs/") + dataset_name + std::string("/res.txt"));
-    for (int i = 650; i <= 650; i += 1000) {
+    for (int i = 400; i <= 400; i += 1000) {
         std::cout << i << "\n";
         evaluate(print, hnsw, i);
     }
@@ -169,6 +169,11 @@ void Create() {
         M = 25;
         efConstruction = 2500;
         n = 1183514;
+    }
+    if (dataset_name == "deep1b") {
+        M = 25;
+        efConstruction = 2500;
+        n = 9990000;
     }
     if (dataset_name == "gist1m") {
         M = 35;
