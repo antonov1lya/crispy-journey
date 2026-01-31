@@ -31,8 +31,8 @@ def train_pq(input_path: str, output_dir: str, M: int, angular: bool):
 
     print('l2^2 norm diff:')
     for i in range(16):
-        before = np.linalg.norm(train_vectors[0] - train_vectors[i])
-        after = np.linalg.norm(train_vectors[0] - index.reconstruct(i))
+        before = np.linalg.norm(train_vectors[0] - train_vectors[i]) ** 2
+        after = np.linalg.norm(train_vectors[0] - index.reconstruct(i)) ** 2
         print(f'original: {before: .3f}, quantized: {after: .3f}')
 
 
