@@ -1,7 +1,8 @@
 import argparse
+
+import faiss
 import h5py
 import numpy as np
-import faiss
 
 NBITS = 8
 

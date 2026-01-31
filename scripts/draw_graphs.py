@@ -1,8 +1,8 @@
 import argparse
-import numpy as np
-import os
 from pathlib import Path
+
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def read_file(file):
