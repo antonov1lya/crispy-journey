@@ -5,6 +5,7 @@ import faiss
 
 NBITS = 8
 
+
 def train_pq(input_path: str, output_dir: str, M: int, angular: bool):
     with h5py.File(input_path, "r") as file:
         train_vectors = file["train"][:]
@@ -23,6 +24,7 @@ def train_pq(input_path: str, output_dir: str, M: int, angular: bool):
     PQ = pq.pq
     centroids = faiss.vector_to_array(PQ.centroids)
 
+    print(transformed_matrix[0])
     transformed_matrix.tofile(f'{output_dir}/matrix{M}.bin')
     centroids.tofile(f'{output_dir}/centroids{M}.bin')
     faiss.vector_to_array(pq.codes).tofile(f'{output_dir}/data_pq{M}.bin')
@@ -46,7 +48,7 @@ def parse_arguments():
 def main():
     args = parse_arguments()
     train_pq(args.input_file, args.output_dir, args.M, args.angular)
-    
+
 
 if __name__ == "__main__":
     main()
