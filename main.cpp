@@ -51,7 +51,7 @@ void ReadData() {
     groundtruth.close();
 }
 
-void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
+double evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
     int n = 10000;
     if (dataset_name == "gist1m") {
         n = 1000;
@@ -60,7 +60,7 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
     hnsw.space_.FlushComputationsNumber();
     auto begin = std::chrono::steady_clock::now();
     for (int i = 0; i < n; ++i) {
-        auto res = hnsw.Search(&query_data[i * SIZE], kNN, ef);
+        auto res = hnsw.SearchPQ(&query_data[i * SIZE], kNN, ef);
         double count = 0;
         for (auto x : res) {
             count += groundtruth_data[i].count(x);
@@ -74,6 +74,45 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
     out << "ef " << ef << "\n";
     out << "avg dist computations " << hnsw.space_.GetComputationsNumber() / n << "\n";
     out << "time " << elapsed_sec.count() << "\n";
+    return result / n;
+}
+
+int find_ef_check(std::ofstream& out, HNSWInference<SPACE>& hnsw, int l, int r, double acc) {
+    int ans = -1;
+    while (l <= r) {
+        int mid = (l + r) / 2;
+        double cur = evaluate(out, hnsw, mid);
+        if (cur >= acc) {
+            ans = mid;
+            r = mid - 1;
+        } else {
+            l = mid + 1;
+        }
+    }
+    return ans;
+}
+
+void find_ef(std::ofstream& out, HNSWInference<SPACE>& hnsw) {
+    // tool for find ef values with given recall
+    std::vector<double> vals;
+    for (double i = 0.9; i < 0.991; i += 0.01) {
+        vals.push_back(i);
+    }
+    std::reverse(vals.begin(), vals.end());
+    std::vector<int> answer;
+    int l = 10, r = 1400;
+    for (double i : vals) {
+        r = find_ef_check(out, hnsw, l, r, i);
+        std::cout << "RES:\n";
+        std::cout << evaluate(out, hnsw, r) << " " << r << "\n";
+        answer.push_back(r);
+    }
+    std::reverse(answer.begin(), answer.end());
+    std::cout << "{";
+    for (int i : answer) {
+        std::cout << i << ", ";
+    }
+    std::cout << "};\n";
 }
 
 void Benchmark() {
@@ -85,18 +124,28 @@ void Benchmark() {
     in.close();
     in_data.close();
 
-    std::ifstream file_data_pq(
-        std::string("datasets/") + dataset_name + std::string("/data_pq32.bin"), std::ios::binary);
-    std::ifstream file_centroids(
-        std::string("datasets/") + dataset_name + std::string("/centroids32.bin"),
-        std::ios::binary);
-    std::ifstream file_matrix(
-        std::string("datasets/") + dataset_name + std::string("/matrix32.bin"), std::ios::binary);
+    std::ifstream file_data_pq(std::string("datasets/") + dataset_name + std::string("/data_pq") +
+                                   std::to_string(SUBSPACES) + std::string(".bin"),
+                               std::ios::binary);
+    std::ifstream file_centroids(std::string("datasets/") + dataset_name +
+                                     std::string("/centroids") + std::to_string(SUBSPACES) +
+                                     std::string(".bin"),
+                                 std::ios::binary);
+    std::ifstream file_matrix(std::string("datasets/") + dataset_name + std::string("/matrix") +
+                                  std::to_string(SUBSPACES) + std::string(".bin"),
+                              std::ios::binary);
+
     hnsw.LoadPQ(file_data_pq, file_centroids);
     hnsw.LoadPQMatrix(file_matrix);
     file_data_pq.close();
     file_centroids.close();
     file_matrix.close();
+
+    // hnsw.FillTable(hnsw.data);
+    // for (int i = 0; i < 16; i++) {
+    //     std::cout << hnsw.GetDistance(i) << "\n";
+    // }
+    // std::cout << "\n";
 
     // std::ifstream file_matrix_rerank(
     //     std::string("datasets/") + dataset_name + std::string("/rerank_matrix.bin"),
@@ -107,8 +156,10 @@ void Benchmark() {
     ReadData();
 
     std::cout << "WARMUP\n";
-    std::ofstream print(std::string("logs/") + dataset_name + std::string("/res.txt"));
-    for (int i = 400; i <= 400; i += 1000) {
+    std::ofstream print(std::string("logs/") + dataset_name + std::string("/pq20.txt"));
+
+    std::vector<int> grid{100};
+    for (int i : grid) {
         std::cout << i << "\n";
         evaluate(print, hnsw, i);
     }
