@@ -9,27 +9,15 @@
 #include "hnsw_inference.h"
 #include "primitives.h"
 
-// #define SPACE SpaceCosine
-#define SPACE SpaceL2
-
-// std::string dataset_name = "fashion_mnist";
-// std::string dataset_name = "gist";
-std::string dataset_name = "sift1m";
-// std::string dataset_name = "glove";
+std::string dataset_name = DATASET;
 
 std::mt19937 gen(0);
-
 std::uniform_real_distribution<FloatType> dist(0, 1);
 
-// std::vector<std::vector<FloatType>> query_data;
 FloatType* query_data;
 std::vector<std::set<IntType>> groundtruth_data;
 
-void NormalizeGlove(FloatType* array) {
-    for (IntType i = 0; i < 1183514; ++i) {
-        Normalize(&(array[i * SIZE]));
-    }
-}
+const int kNN = 10;
 
 void ReadData() {
     std::ifstream query(std::string("datasets/") + dataset_name + std::string("/query.bin"),
@@ -41,18 +29,9 @@ void ReadData() {
     if (dataset_name == "gist") {
         n = 1000;
     }
-    int k = 10;
-    // query_data = std::vector<std::vector<FloatType>>(n, std::vector<FloatType>(SIZE));
+
     query_data = (FloatType*)malloc(n * SIZE * sizeof(FloatType));
     query.read(reinterpret_cast<char*>(query_data), n * SIZE * sizeof(FloatType));
-    // for (int i = 0; i < n; ++i) {
-    //     for (int j = 0; j < SIZE; ++j) {
-    //         query >> query_data[i][j];
-    //     }
-    //     if (dataset_name == "glove") {
-    //         Normalize(&query_data[i][0]);
-    //     }
-    // }
 
     auto ReadBinaryInt = [&groundtruth](IntType& value) {
         groundtruth.read(reinterpret_cast<char*>(&value), sizeof(IntType));
@@ -63,32 +42,30 @@ void ReadData() {
         for (int j = 0; j < 100; ++j) {
             IntType x;
             ReadBinaryInt(x);
-            // groundtruth >> x;
-            if (j < k) {
+            if (j < kNN) {
                 groundtruth_data[i].insert(x);
             }
         }
     }
     query.close();
     groundtruth.close();
-    // free(query_data);
 }
 
-void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef, int k = 10) {
+double evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
     int n = 10000;
-    if (dataset_name == "gist") {
+    if (dataset_name == "gist1m") {
         n = 1000;
     }
     double result = 0;
     hnsw.space_.FlushComputationsNumber();
     auto begin = std::chrono::steady_clock::now();
     for (int i = 0; i < n; ++i) {
-        auto res = hnsw.Search(&query_data[i * SIZE], k, ef);
+        auto res = hnsw.SearchPQ(&query_data[i * SIZE], kNN, ef);
         double count = 0;
         for (auto x : res) {
             count += groundtruth_data[i].count(x);
         }
-        count /= k;
+        count /= kNN;
         result += count;
     }
     auto end = std::chrono::steady_clock::now();
@@ -97,6 +74,45 @@ void evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef, int k =
     out << "ef " << ef << "\n";
     out << "avg dist computations " << hnsw.space_.GetComputationsNumber() / n << "\n";
     out << "time " << elapsed_sec.count() << "\n";
+    return result / n;
+}
+
+int find_ef_check(std::ofstream& out, HNSWInference<SPACE>& hnsw, int l, int r, double acc) {
+    int ans = -1;
+    while (l <= r) {
+        int mid = (l + r) / 2;
+        double cur = evaluate(out, hnsw, mid);
+        if (cur >= acc) {
+            ans = mid;
+            r = mid - 1;
+        } else {
+            l = mid + 1;
+        }
+    }
+    return ans;
+}
+
+void find_ef(std::ofstream& out, HNSWInference<SPACE>& hnsw) {
+    // tool for find ef values with given recall
+    std::vector<double> vals;
+    for (double i = 0.9; i < 0.991; i += 0.01) {
+        vals.push_back(i);
+    }
+    std::reverse(vals.begin(), vals.end());
+    std::vector<int> answer;
+    int l = 10, r = 1400;
+    for (double i : vals) {
+        r = find_ef_check(out, hnsw, l, r, i);
+        std::cout << "RES:\n";
+        std::cout << evaluate(out, hnsw, r) << " " << r << "\n";
+        answer.push_back(r);
+    }
+    std::reverse(answer.begin(), answer.end());
+    std::cout << "{";
+    for (int i : answer) {
+        std::cout << i << ", ";
+    }
+    std::cout << "};\n";
 }
 
 void Benchmark() {
@@ -108,36 +124,46 @@ void Benchmark() {
     in.close();
     in_data.close();
 
-    // if (dataset_name == "glove") {
-    //     for (int i = 0; i < 1183514; ++i) {
-    //         Normalize(hnsw.data + i * SIZE);
-    //     }
+    std::ifstream file_data_pq(std::string("datasets/") + dataset_name + std::string("/data_pq") +
+                                   std::to_string(SUBSPACES) + std::string(".bin"),
+                               std::ios::binary);
+    std::ifstream file_centroids(std::string("datasets/") + dataset_name +
+                                     std::string("/centroids") + std::to_string(SUBSPACES) +
+                                     std::string(".bin"),
+                                 std::ios::binary);
+    std::ifstream file_matrix(std::string("datasets/") + dataset_name + std::string("/matrix") +
+                                  std::to_string(SUBSPACES) + std::string(".bin"),
+                              std::ios::binary);
+
+    hnsw.LoadPQ(file_data_pq, file_centroids);
+    hnsw.LoadPQMatrix(file_matrix);
+    file_data_pq.close();
+    file_centroids.close();
+    file_matrix.close();
+
+    // hnsw.FillTable(hnsw.data);
+    // for (int i = 0; i < 16; i++) {
+    //     std::cout << hnsw.GetDistance(i) << "\n";
     // }
+    // std::cout << "\n";
+
+    // std::ifstream file_matrix_rerank(
+    //     std::string("datasets/") + dataset_name + std::string("/rerank_matrix.bin"),
+    //     std::ios::binary);
+    // hnsw.LoadReRankMatrix(file_matrix_rerank);
+    // file_matrix_rerank.close();
 
     ReadData();
 
     std::cout << "WARMUP\n";
-    std::ofstream trash(std::string("logs/") + dataset_name + std::string("/result.txt"));
-    for (int i = 1000; i <= 1000; i += 10) {
+    std::ofstream print(std::string("logs/") + dataset_name + std::string("/pq20.txt"));
+
+    std::vector<int> grid{100};
+    for (int i : grid) {
         std::cout << i << "\n";
-        evaluate(trash, hnsw, i, 10);
+        evaluate(print, hnsw, i);
     }
-    trash.close();
-
-    // k=10
-    // sift 30,100,10
-    // glove 200,1500,100
-
-    // std::cout << "START\n";
-    // std::ofstream print("bench/sift/mst.txt");
-    // {
-    //     for (int j = 0; j < 5; j++)
-    //         for (int i = 30; i <= 100; i += 10) {
-    //             std::cout << i << " " << j << "\n";
-    //             evaluate(print, hnsw, i, 10);
-    //         }
-    //     print << "NEXT\n";
-    // }
+    print.close();
 }
 
 void Reorder() {
@@ -149,15 +175,28 @@ void Reorder() {
     in.close();
     in_data.close();
 
-    // if (dataset_name == "glove") {
-    //     for (int i = 0; i < 1183514; ++i) {
-    //         Normalize(hnsw.data_long_ + i * SIZE);
-    //     }
-    // }
-
     hnsw.ReOrdering();
 
-    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/mst.bin"),
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/reordering_bfs.bin"),
+                      std::ios::binary);
+    hnsw.Save(out);
+    out.close();
+}
+
+void SSG() {
+    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/classic.bin"),
+                     std::ios::binary);
+    std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.bin"),
+                          std::ios::binary);
+    HNSW<SPACE> hnsw(in, in_data);
+    in.close();
+    in_data.close();
+
+    for (IntType _ = 0; _ < 5; ++_) {
+        hnsw.ImproveSSG();
+    }
+
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/ssg_classic.bin"),
                       std::ios::binary);
     hnsw.Save(out);
     out.close();
@@ -173,18 +212,21 @@ void Create() {
         n = 60000;
     }
     if (dataset_name == "sift1m") {
-        // M = 25;
-        // efConstruction = 600;
-        M = 16;
-        efConstruction = 32;
+        M = 25;
+        efConstruction = 600;
         n = 1000000;
     }
-    if (dataset_name == "glove") {
+    if (dataset_name == "glove100") {
         M = 25;
         efConstruction = 2500;
         n = 1183514;
     }
-    if (dataset_name == "gist") {
+    if (dataset_name == "deep1b") {
+        M = 25;
+        efConstruction = 2500;
+        n = 9990000;
+    }
+    if (dataset_name == "gist1m") {
         M = 35;
         efConstruction = 800;
         n = 1000000;
@@ -192,9 +234,6 @@ void Create() {
     FloatType el = 1.0 / std::log(1.0 * M);
     HNSW<SPACE> hnsw(M, efConstruction, n, in);
     in.close();
-    // if (dataset_name == "glove") {
-    //     NormalizeGlove(&(hnsw.data_long_[0]));
-    // }
     for (int i = 0; i < n; ++i) {
         if (i % 1000 == 0) {
             std::cout << i << "\n";
@@ -215,6 +254,7 @@ int main() {
     // Reorder();
     // PrintGraph();
     // ReadReorder();
+    // SSG();
 
     return 0;
 }
