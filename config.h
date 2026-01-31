@@ -1,19 +1,11 @@
 #pragma once
 
 // #define SIFT1M
-// #define GLOVE100
+#define GLOVE100
 // #define GIST1M
-#define DEEP1B
+// #define DEEP1B
 
 #define REORDER
-
-#define SUBSPACES 32
-#define SUBSIZE 30
-
-// #define SUBSPACES 20
-// #define SUBSIZE 5
-
-#define BITS 256
 
 #define ALIGN64 64
 #define ALIGN4 4
@@ -27,7 +19,7 @@
 #ifdef GLOVE100
 #define DATASET "glove100"
 #define SIZE 100
-#define SPACE SpaceL2
+#define SPACE SpaceCosine
 #endif
 
 #ifdef GIST1M
@@ -41,3 +33,8 @@
 #define SIZE 96
 #define SPACE SpaceCosine
 #endif
+
+#define BITS 256
+
+#define SUBSPACES 20
+#define SUBSIZE (SIZE / SUBSPACES)
