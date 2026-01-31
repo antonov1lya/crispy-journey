@@ -55,8 +55,13 @@ struct SpaceCosine {
         }
         return 1 - distance;
     }
-    FloatType DistanceSubspace(FloatType* x, FloatType* y) {
-        return 0;
+    FloatType DistanceSubspace(const FloatType* x, const FloatType* y) {
+        FloatType distance = 0;
+        for (IntType i = 0; i < SUBSIZE; ++i) {
+            FloatType diff = x[i] - y[i];
+            distance += diff * diff;
+        }
+        return distance;
     }
     IntType GetComputationsNumber() {
         return computations_;

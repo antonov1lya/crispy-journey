@@ -139,15 +139,16 @@ inline void HNSWInference<Space>::FillTable(FloatType* query) {
 template <typename Space>
 inline FloatType HNSWInference<Space>::GetDistance(IntType node) {
     const uint8_t* query = quantized_data + node * SUBSPACES;
+    int i = 0;
     FloatType r0 = 0, r1 = 0, r2 = 0, r3 = 0;
-    for (int i = 0; i < SUBSPACES; i += 4) {
+    for (; i + 3 < SUBSPACES; i += 4) {
         r0 += pq_table[i][query[i]];
         r1 += pq_table[i + 1][query[i + 1]];
         r2 += pq_table[i + 2][query[i + 2]];
         r3 += pq_table[i + 3][query[i + 3]];
     }
     FloatType result = r0 + r1 + r2 + r3;
-    for (int i = SUBSPACES & ~3; i < SUBSPACES; ++i) {
+    for (; i < SUBSPACES; ++i) {
         result += pq_table[i][query[i]];
     }
     return result;
