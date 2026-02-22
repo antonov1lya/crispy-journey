@@ -1,6 +1,7 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <queue>
 #include <random>
 #include <set>
 #include <vector>
@@ -60,7 +61,11 @@ double evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
     hnsw.space_.FlushComputationsNumber();
     auto begin = std::chrono::steady_clock::now();
     for (int i = 0; i < n; ++i) {
+#ifdef PQ
         auto res = hnsw.SearchPQ(&query_data[i * SIZE], kNN, ef);
+#else
+        auto res = hnsw.Search(&query_data[i * SIZE], kNN, ef);
+#endif
         double count = 0;
         for (auto x : res) {
             count += groundtruth_data[i].count(x);
@@ -94,13 +99,14 @@ int find_ef_check(std::ofstream& out, HNSWInference<SPACE>& hnsw, int l, int r, 
 
 void find_ef(std::ofstream& out, HNSWInference<SPACE>& hnsw) {
     // tool for find ef values with given recall
+    std::cout << "find ef...\n";
     std::vector<double> vals;
     for (double i = 0.9; i < 0.991; i += 0.01) {
         vals.push_back(i);
     }
     std::reverse(vals.begin(), vals.end());
     std::vector<int> answer;
-    int l = 10, r = 1400;
+    int l = 10, r = EF_R;
     for (double i : vals) {
         r = find_ef_check(out, hnsw, l, r, i);
         std::cout << "RES:\n";
@@ -124,6 +130,7 @@ void Benchmark() {
     in.close();
     in_data.close();
 
+#ifdef PQ
     std::ifstream file_data_pq(std::string("datasets/") + dataset_name + std::string("/data_pq") +
                                    std::to_string(SUBSPACES) + std::string(".bin"),
                                std::ios::binary);
@@ -140,6 +147,7 @@ void Benchmark() {
     file_data_pq.close();
     file_centroids.close();
     file_matrix.close();
+#endif
 
     // hnsw.FillTable(hnsw.data);
     // for (int i = 0; i < 16; i++) {
@@ -155,9 +163,14 @@ void Benchmark() {
 
     ReadData();
 
-    std::cout << "WARMUP\n";
-    std::ofstream print(std::string("logs/") + dataset_name + std::string("/pq20.txt"));
+#ifdef FIND_EF
+    std::ofstream print1(std::string("logs/") + dataset_name + std::string("/tmp.txt"));
+    find_ef(print1, hnsw);
+    print1.close();
+#endif
 
+    std::cout << "WARMUP\n";
+    std::ofstream print(std::string("logs/") + dataset_name + std::string("/tmp.txt"));
     std::vector<int> grid{100};
     for (int i : grid) {
         std::cout << i << "\n";
@@ -175,16 +188,36 @@ void Reorder() {
     in.close();
     in_data.close();
 
+    // std::queue<int> q;
+    // std::vector<bool> was(hnsw.size_, false);
+
+    // int st = 100000;
+    // q.push(st);
+    // was[st] = true;
+    // int sum = 0;
+    // while (!q.empty()) {
+    //     sum++;
+    //     int x = q.front();
+    //     q.pop();
+    //     for (int y : hnsw.graph_[x].neighbors_[0]) {
+    //         if (!was[y]) {
+    //             was[y] = 1;
+    //             q.push(y);
+    //         }
+    //     }
+    // }
+    // std::cout << sum << "\n";
+
     hnsw.ReOrdering();
 
-    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/reordering_bfs.bin"),
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/reordered.bin"),
                       std::ios::binary);
     hnsw.Save(out);
     out.close();
 }
 
 void SSG() {
-    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/classic.bin"),
+    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/knn.bin"),
                      std::ios::binary);
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.bin"),
                           std::ios::binary);
@@ -192,11 +225,28 @@ void SSG() {
     in.close();
     in_data.close();
 
-    for (IntType _ = 0; _ < 5; ++_) {
+    for (IntType _ = 0; _ < 1; ++_) {
         hnsw.ImproveSSG();
     }
 
-    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/ssg_classic.bin"),
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/ssg.bin"),
+                      std::ios::binary);
+    hnsw.Save(out);
+    out.close();
+}
+
+void BuildKNN() {
+    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/base.bin"),
+                     std::ios::binary);
+    std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.bin"),
+                          std::ios::binary);
+    HNSW<SPACE> hnsw(in, in_data);
+    in.close();
+    in_data.close();
+
+    hnsw.BuildKNNGraph(1000, 200);
+
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/knn.bin"),
                       std::ios::binary);
     hnsw.Save(out);
     out.close();
@@ -248,13 +298,14 @@ void Create() {
 }
 
 int main() {
-    // DO: sudo sysctl vm.nr_hugepages=1024
+    // DO: sudo sysctl vm.nr_hugepages=2048
     // Create();
     Benchmark();
     // Reorder();
     // PrintGraph();
     // ReadReorder();
     // SSG();
+    // BuildKNN();
 
     return 0;
 }

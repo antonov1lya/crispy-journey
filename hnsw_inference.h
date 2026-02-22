@@ -283,6 +283,14 @@ inline std::vector<IntType> HNSWInference<Space>::Search(FloatType* query, IntTy
     for (IntType i = max_level_; i >= 1; --i) {
         enter_point = SearchLayer(query, enter_point, 1, i).top().second;
     }
+    // int dst_base = space_.Distance(data + SIZE * enter_point, query);
+    // for (int it : grid) {
+    //     int dst_cur = space_.Distance(data + SIZE * it, query);
+    //     if (dst_cur < dst_base) {
+    //         dst_base = dst_cur;
+    //         enter_point = it;
+    //     }
+    // }
     auto nearest_neighbours = SearchLayer(query, enter_point, ef, 0);
     while (nearest_neighbours.size() > K) {
         nearest_neighbours.pop();
@@ -356,6 +364,7 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
     list = (IntType**)(aligned_alloc(ALIGN64, size_ * sizeof(IntType*)));
     list0 = (IntType*)(aligned_alloc(ALIGN64, size_ * (maxM0_ + 1) * sizeof(IntType)));
 
+    IntType degree_sum = 0;
     for (IntType node = 0; node < size_; ++node) {
         IntType level_number;
         ReadBinaryInt(level_number);
@@ -366,6 +375,9 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
         for (IntType level = 0; level < level_number; ++level) {
             IntType neighbour_number;
             ReadBinaryInt(neighbour_number);
+            if (level == 0) {
+                degree_sum += neighbour_number;
+            }
             IntType* pointer;
             if (level == 0) {
                 pointer = (IntType*)(list0 + (maxM0_ + 1) * node);
@@ -381,6 +393,8 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
             }
         }
     }
+    std::cout << "avg degree " << static_cast<FloatType>(degree_sum) / size_ << "\n";
+    std::cout << "maxM: " << maxM_ << ", maxM0: " << maxM0_ << "\n";
 
     IntType reorder_old_size;
     ReadBinaryInt(reorder_old_size);

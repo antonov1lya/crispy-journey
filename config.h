@@ -1,8 +1,8 @@
 #pragma once
 
 // #define SIFT1M
-#define GLOVE100
-// #define GIST1M
+// #define GLOVE100
+#define GIST1M
 // #define DEEP1B
 
 #define REORDER
@@ -36,5 +36,9 @@
 
 #define BITS 256
 
-#define SUBSPACES 20
+#define PQ
+#define SUBSPACES 32
 #define SUBSIZE (SIZE / SUBSPACES)
+
+// #define FIND_EF
+#define EF_R 1400

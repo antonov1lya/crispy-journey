@@ -51,6 +51,7 @@ struct HNSW {
                                              IntType maxM);
     std::vector<IntType> SSGAdapter(IntType node, std::vector<IntType>& candidates);
     void ImproveSSG();
+    void BuildKNNGraph(int ef, int K);
     std::vector<IntType> Search(FloatType* query, IntType K, IntType ef);
     void BFSReOrdering();
     void MSTReOrdering();
@@ -267,7 +268,7 @@ inline std::vector<IntType> HNSW<Space>::SSGAdapter(IntType node,
             space_.Distance(&(data_long_[node * SIZE]), &(data_long_[neighbour * SIZE])),
             neighbour);
     }
-    return SelectNeighboursSSG(node, candidates_queue, maxM_, maxM_);
+    return SelectNeighboursSSG(node, candidates_queue, maxM0_, maxM0_);
 }
 
 template <typename Space>
@@ -279,54 +280,60 @@ inline void HNSW<Space>::ImproveSSG() {
             std::cout << node << "\n";
         }
         for (IntType level = 0; level < 1; ++level) {
-            std::vector<IntType> candidates;
-            candidates.reserve(maxM0_ * maxM0_);
+            std::set<IntType> candidates;
             for (IntType x : graph_[node].neighbors_[level]) {
                 if (x != node) {
-                    candidates.push_back(x);
-                }
-                for (IntType y : graph_[x].neighbors_[level]) {
-                    if (y != node) {
-                        candidates.push_back(y);
-                    }
+                    candidates.insert(x);
                 }
             }
-            ne[node] = SSGAdapter(node, candidates);
+            for (IntType x : graph_[node].neighbors_[level]) {
+                for (IntType y : graph_[x].neighbors_[level]) {
+                    if (y != node) {
+                        candidates.insert(y);
+                    }
+                    if (candidates.size() > 2500) {
+                        break;
+                    }
+                }
+                if (candidates.size() > 2500) {
+                    break;
+                }
+            }
+            std::vector<IntType> candidates_;
+            for (IntType cur : candidates) {
+                candidates_.push_back(cur);
+            }
+            ne[node] = SSGAdapter(node, candidates_);
         }
     }
-    std::cout << "SECOND STAGE\n";
-    std::vector<std::vector<IntType>> ne2(size_);
     for (IntType node = 0; node < size_; ++node) {
-        for (IntType next : ne[node]) {
-            ne2[node].push_back(next);
-            ne2[next].push_back(node);
-        }
+        graph_[node].neighbors_[0] = ne[node];
     }
-    std::cout << "THIRD STAGE\n";
-    for (IntType node = 0; node < size_; ++node) {
-        if (node % 10000 == 0) {
-            std::cout << node << "\n";
-        }
-        graph_[node].neighbors_[0] = SSGAdapter(node, ne2[node]);
-    }
-
-    // for (IntType node = 0; node < size_; ++node) {
-    //     graph_[node].neighbors_[0] = ne[node];
-    // }
     // std::cout << "SECOND STAGE\n";
     // for (IntType node = 0; node < size_; ++node) {
     //     if (node % 10000 == 0) {
     //         std::cout << node << "\n";
     //     }
-    //     for (IntType level = 0; level < 1; ++level) {
-    //         for (IntType x : graph_[node].neighbors_[level]) {
-    //             if (node != x) {
-    //                 graph_[x].neighbors_[level].push_back(node);
-    //                 graph_[x].neighbors_[level] = SSGAdapter(node, graph_[x].neighbors_[level]);
-    //             }
-    //         }
+    //     for (IntType next : graph_[node].neighbors_[0]) {
+    //         graph_[next].neighbors_[0].push_back(node);
+    //         graph_[next].neighbors_[0] = SSGAdapter(node, graph_[next].neighbors_[0]);
     //     }
     // }
+}
+
+template <typename Space>
+inline void HNSW<Space>::BuildKNNGraph(int ef, int K) {
+    std::vector<std::vector<IntType>> ne(size_);
+    for (IntType node = 0; node < size_; ++node) {
+        if (node % 1000 == 0) {
+            std::cout << node << "\n";
+        }
+        auto res = Search(&data_long_[node * SIZE], K, ef);
+        ne[node] = res;
+    }
+    for (int node = 0; node < size_; ++node) {
+        graph_[node].neighbors_[0] = ne[node];
+    }
 }
 
 template <typename Space>
