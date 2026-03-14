@@ -39,6 +39,7 @@
 #define PQ
 #define SUBSPACES 32
 #define SUBSIZE (SIZE / SUBSPACES)
+// #define BATCH
 
 // #define FIND_EF
 #define EF_R 1400

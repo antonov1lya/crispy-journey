@@ -1,3 +1,4 @@
+#include <cassert>
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -70,6 +71,7 @@ double evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
         for (auto x : res) {
             count += groundtruth_data[i].count(x);
         }
+        assert(res.size() == kNN);
         count /= kNN;
         result += count;
     }
@@ -183,11 +185,10 @@ void Benchmark() {
 #endif
 
     std::cout << "WARMUP\n";
-    std::ofstream print(std::string("logs/") + dataset_name + std::string("/benchmark.txt"));
+    std::ofstream print(std::string("logs/") + dataset_name + std::string("/benchmark1.txt"));
 
-    for(int _=0; _<10; _++)
-    {
-        std::vector<int> grid{650};
+    for (int _ = 0; _ < 10; _++) {
+        std::vector<int> grid{400};
         for (int i : grid) {
             std::cout << i << "\n";
             evaluate(print, hnsw, i);
