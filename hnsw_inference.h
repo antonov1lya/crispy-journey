@@ -558,7 +558,7 @@ inline QueueLess HNSWInference<Space>::SearchLayerPQBatch4(FloatType* query, Int
         }
 
         IntType i = 0;
-        if (i + 4 < neighbors_sz) {
+        if (i + 3 < neighbors_sz) {
             _mm_prefetch((char*)(quantized_data + SUBSPACES * search_neighbors[i]), _MM_HINT_T0);
             _mm_prefetch((char*)(quantized_data + SUBSPACES * search_neighbors[i + 1]),
                          _MM_HINT_T0);
