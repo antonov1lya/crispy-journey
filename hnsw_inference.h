@@ -4,6 +4,7 @@
 #include <sys/mman.h>
 
 #include "primitives.h"
+#include "third_party/faiss/faiss/impl/pq_code_distance/pq_code_distance-avx2.h"
 
 void* HugeAlloc(size_t total_size_bytes) {
     size_t hugepage_size = 2 * 1024 * 1024;
@@ -26,6 +27,8 @@ struct HNSWInference {
     void FillTable(FloatType* query);
     FloatType GetDistance(IntType node);
     QueueLess SearchLayer(FloatType* query, IntType enter_point, IntType ef, IntType level);
+    QueueLess SearchLayerBatch4(FloatType* query, IntType enter_point, IntType ef, IntType level);
+    QueueLess SearchLayerBatch8(FloatType* query, IntType enter_point, IntType ef, IntType level);
     QueueLess SearchLayerPQ(FloatType* query, IntType enter_point, IntType ef, IntType level);
     std::vector<IntType> Search(FloatType* query, IntType K, IntType ef);
     std::vector<IntType> SearchPQ(FloatType* query, IntType K, IntType ef);
@@ -52,13 +55,17 @@ struct HNSWInference {
 
     uint8_t* quantized_data;
     FloatType* centroids;
-    std::array<std::array<FloatType, 256>, SUBSPACES> pq_table;
+    // std::array<std::array<FloatType, 256>, SUBSPACES> pq_table;
+    float pq_table[SUBSPACES][256];
     FloatType* matrix_PQ;
     FloatType* vector_PQ;
     bool need_mm_PQ = false;
     FloatType* matrix_rerank;
     FloatType* vector_rerank;
     bool need_mm_rerank = false;
+
+    IntType* search_neighbors;
+    FloatType* search_distances;
 };
 
 template <typename Space>
@@ -138,7 +145,9 @@ inline void HNSWInference<Space>::FillTable(FloatType* query) {
 
 template <typename Space>
 inline FloatType HNSWInference<Space>::GetDistance(IntType node) {
-    const uint8_t* query = quantized_data + node * SUBSPACES;
+    return faiss::pq_code_distance::pq_code_distance_single_impl(SUBSPACES, &pq_table[0][0],
+                                                                 quantized_data + node * SUBSPACES);
+    const uint8_t* __restrict query = quantized_data + node * SUBSPACES;
     int i = 0;
     FloatType r0 = 0, r1 = 0, r2 = 0, r3 = 0;
     for (; i + 3 < SUBSPACES; i += 4) {
@@ -152,6 +161,228 @@ inline FloatType HNSWInference<Space>::GetDistance(IntType node) {
         result += pq_table[i][query[i]];
     }
     return result;
+}
+
+template <typename Space>
+inline QueueLess HNSWInference<Space>::SearchLayerBatch4(FloatType* query, IntType enter_point,
+                                                         IntType ef, IntType level) {
+    was_[enter_point] = ++current_was_;
+    QueueGreater candidates;
+
+    FloatType* ep_pointer = data + SIZE * enter_point;
+    FloatType enter_point_distance = space_.Distance(ep_pointer, query);
+
+    candidates.emplace(enter_point_distance, enter_point);
+
+    QueueLess nearest_neighbours;
+    nearest_neighbours.emplace(enter_point_distance, enter_point);
+
+    while (!candidates.empty()) {
+        IntType current = candidates.top().second;
+        FloatType current_distance = candidates.top().first;
+        candidates.pop();
+        FloatType furthest_distance = nearest_neighbours.top().first;
+
+        if (current_distance > furthest_distance) {
+            break;
+        }
+
+        IntType* pointer;
+        if (level == 0) {
+            pointer = list0 + (maxM0_ + 1) * current;
+        } else {
+            pointer = list[current] + (level - 1) * (maxM_ + 1);
+        }
+
+        IntType cursz = pointer[0];
+        _mm_prefetch((char*)(was_ + *(pointer + 1)), _MM_HINT_T0);
+
+        IntType neighbors_sz = 0;
+        for (IntType i = 1; i <= cursz; ++i) {
+            IntType next = pointer[i];
+            if (i != cursz) {
+                _mm_prefetch((char*)(was_ + *(pointer + i + 1)), _MM_HINT_T0);
+            }
+            if (was_[next] != current_was_) {
+                was_[next] = current_was_;
+                search_neighbors[neighbors_sz] = next;
+                ++neighbors_sz;
+            }
+        }
+
+        IntType i = 0;
+        if (i + 4 < neighbors_sz) {
+            _mm_prefetch((char*)(data + search_neighbors[i] * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + search_neighbors[i + 1] * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + search_neighbors[i + 2] * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + search_neighbors[i + 3] * SIZE), _MM_HINT_T0);
+        }
+        for (; i + 3 < neighbors_sz; i += 4) {
+            if (i + 7 < neighbors_sz) {
+                _mm_prefetch((char*)(data + search_neighbors[i + 4] * SIZE), _MM_HINT_T0);
+                _mm_prefetch((char*)(data + search_neighbors[i + 5] * SIZE), _MM_HINT_T0);
+                _mm_prefetch((char*)(data + search_neighbors[i + 6] * SIZE), _MM_HINT_T0);
+                _mm_prefetch((char*)(data + search_neighbors[i + 7] * SIZE), _MM_HINT_T0);
+            }
+
+            space_.DistanceBatch4(
+                query, data + SIZE * search_neighbors[i], data + SIZE * search_neighbors[i + 1],
+                data + SIZE * search_neighbors[i + 2], data + SIZE * search_neighbors[i + 3],
+                search_distances + i, search_distances + i + 1, search_distances + i + 2,
+                search_distances + i + 3);
+        }
+
+        if (i + 1 < neighbors_sz) {
+            _mm_prefetch((char*)(data + search_neighbors[i] * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + search_neighbors[i + 1] * SIZE), _MM_HINT_T0);
+            space_.DistanceBatch2(query, data + SIZE * search_neighbors[i],
+                                  data + SIZE * search_neighbors[i + 1], search_distances + i,
+                                  search_distances + i + 1);
+            i += 2;
+        }
+
+        if (i < neighbors_sz) {
+            search_distances[i] = space_.Distance(query, data + SIZE * search_neighbors[i]);
+            ++i;
+        }
+
+        for (i = 0; i < neighbors_sz; ++i) {
+            IntType next = search_neighbors[i];
+            furthest_distance = nearest_neighbours.top().first;
+            FloatType distance = search_distances[i];
+            if (distance < furthest_distance or nearest_neighbours.size() < ef) {
+                candidates.emplace(distance, next);
+                nearest_neighbours.emplace(distance, next);
+                if (nearest_neighbours.size() > ef) {
+                    nearest_neighbours.pop();
+                }
+            }
+        }
+    }
+    return nearest_neighbours;
+}
+
+template <typename Space>
+inline QueueLess HNSWInference<Space>::SearchLayerBatch8(FloatType* query, IntType enter_point,
+                                                         IntType ef, IntType level) {
+    was_[enter_point] = ++current_was_;
+    QueueGreater candidates;
+
+    FloatType* ep_pointer = data + SIZE * enter_point;
+    FloatType enter_point_distance = space_.Distance(ep_pointer, query);
+
+    candidates.emplace(enter_point_distance, enter_point);
+
+    QueueLess nearest_neighbours;
+    nearest_neighbours.emplace(enter_point_distance, enter_point);
+
+    while (!candidates.empty()) {
+        IntType current = candidates.top().second;
+        FloatType current_distance = candidates.top().first;
+        candidates.pop();
+        FloatType furthest_distance = nearest_neighbours.top().first;
+
+        if (current_distance > furthest_distance) {
+            break;
+        }
+
+        IntType* pointer;
+        if (level == 0) {
+            pointer = list0 + (maxM0_ + 1) * current;
+        } else {
+            pointer = list[current] + (level - 1) * (maxM_ + 1);
+        }
+
+        IntType cursz = pointer[0];
+        _mm_prefetch((char*)(was_ + *(pointer + 1)), _MM_HINT_T0);
+
+        IntType neighbors_sz = 0;
+        for (IntType i = 1; i <= cursz; ++i) {
+            IntType next = pointer[i];
+            if (i != cursz) {
+                _mm_prefetch((char*)(was_ + *(pointer + i + 1)), _MM_HINT_T0);
+            }
+            if (was_[next] != current_was_) {
+                was_[next] = current_was_;
+                search_neighbors[neighbors_sz] = next;
+                ++neighbors_sz;
+            }
+        }
+
+        IntType i = 0;
+        if (i + 7 < neighbors_sz) {
+            _mm_prefetch((char*)(data + search_neighbors[i] * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + search_neighbors[i + 1] * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + search_neighbors[i + 2] * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + search_neighbors[i + 3] * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + search_neighbors[i + 4] * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + search_neighbors[i + 5] * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + search_neighbors[i + 6] * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + search_neighbors[i + 7] * SIZE), _MM_HINT_T0);
+        }
+        for (; i + 7 < neighbors_sz; i += 8) {
+            if (i + 15 < neighbors_sz) {
+                _mm_prefetch((char*)(data + search_neighbors[i + 8] * SIZE), _MM_HINT_T0);
+                _mm_prefetch((char*)(data + search_neighbors[i + 9] * SIZE), _MM_HINT_T0);
+                _mm_prefetch((char*)(data + search_neighbors[i + 10] * SIZE), _MM_HINT_T0);
+                _mm_prefetch((char*)(data + search_neighbors[i + 11] * SIZE), _MM_HINT_T0);
+                _mm_prefetch((char*)(data + search_neighbors[i + 12] * SIZE), _MM_HINT_T0);
+                _mm_prefetch((char*)(data + search_neighbors[i + 13] * SIZE), _MM_HINT_T0);
+                _mm_prefetch((char*)(data + search_neighbors[i + 14] * SIZE), _MM_HINT_T0);
+                _mm_prefetch((char*)(data + search_neighbors[i + 15] * SIZE), _MM_HINT_T0);
+            }
+
+            space_.DistanceBatch8(
+                query, data + SIZE * search_neighbors[i], data + SIZE * search_neighbors[i + 1],
+                data + SIZE * search_neighbors[i + 2], data + SIZE * search_neighbors[i + 3],
+                data + SIZE * search_neighbors[i + 4], data + SIZE * search_neighbors[i + 5],
+                data + SIZE * search_neighbors[i + 6], data + SIZE * search_neighbors[i + 7],
+                search_distances + i, search_distances + i + 1, search_distances + i + 2,
+                search_distances + i + 3, search_distances + i + 4, search_distances + i + 5,
+                search_distances + i + 6, search_distances + i + 7);
+        }
+
+        if (i + 3 < neighbors_sz) {
+            _mm_prefetch((char*)(data + search_neighbors[i] * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + search_neighbors[i + 1] * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + search_neighbors[i + 2] * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + search_neighbors[i + 3] * SIZE), _MM_HINT_T0);
+            space_.DistanceBatch4(
+                query, data + SIZE * search_neighbors[i], data + SIZE * search_neighbors[i + 1],
+                data + SIZE * search_neighbors[i + 2], data + SIZE * search_neighbors[i + 3],
+                search_distances + i, search_distances + i + 1, search_distances + i + 2,
+                search_distances + i + 3);
+            i += 4;
+        }
+
+        if (i + 1 < neighbors_sz) {
+            _mm_prefetch((char*)(data + search_neighbors[i] * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + search_neighbors[i + 1] * SIZE), _MM_HINT_T0);
+            space_.DistanceBatch2(query, data + SIZE * search_neighbors[i],
+                                  data + SIZE * search_neighbors[i + 1], search_distances + i,
+                                  search_distances + i + 1);
+            i += 2;
+        }
+
+        if (i < neighbors_sz) {
+            search_distances[i] = space_.Distance(query, data + SIZE * search_neighbors[i]);
+            ++i;
+        }
+
+        for (i = 0; i < neighbors_sz; ++i) {
+            IntType next = search_neighbors[i];
+            furthest_distance = nearest_neighbours.top().first;
+            FloatType distance = search_distances[i];
+            if (distance < furthest_distance or nearest_neighbours.size() < ef) {
+                candidates.emplace(distance, next);
+                nearest_neighbours.emplace(distance, next);
+                if (nearest_neighbours.size() > ef) {
+                    nearest_neighbours.pop();
+                }
+            }
+        }
+    }
+    return nearest_neighbours;
 }
 
 template <typename Space>
@@ -283,6 +514,14 @@ inline std::vector<IntType> HNSWInference<Space>::Search(FloatType* query, IntTy
     for (IntType i = max_level_; i >= 1; --i) {
         enter_point = SearchLayer(query, enter_point, 1, i).top().second;
     }
+    // int dst_base = space_.Distance(data + SIZE * enter_point, query);
+    // for (int it : grid) {
+    //     int dst_cur = space_.Distance(data + SIZE * it, query);
+    //     if (dst_cur < dst_base) {
+    //         dst_base = dst_cur;
+    //         enter_point = it;
+    //     }
+    // }
     auto nearest_neighbours = SearchLayer(query, enter_point, ef, 0);
     while (nearest_neighbours.size() > K) {
         nearest_neighbours.pop();
@@ -314,6 +553,8 @@ inline std::vector<IntType> HNSWInference<Space>::SearchPQ(FloatType* query, Int
         MatVecMul(matrix_rerank, query, vector_rerank);
         query = vector_rerank;
     }
+
+    /*
     std::vector<std::pair<FloatType, IntType>> candidates;
     candidates.reserve(nearest_neighbours.size());
     while (!nearest_neighbours.empty()) {
@@ -322,6 +563,60 @@ inline std::vector<IntType> HNSWInference<Space>::SearchPQ(FloatType* query, Int
         FloatType distance = space_.Distance(ne_pointer, query);
         nearest_neighbours.pop();
         candidates.push_back({distance, next});
+    }
+    std::sort(candidates.begin(), candidates.end());
+    std::vector<IntType> array;
+    array.reserve(nearest_neighbours.size());
+    for (int i = 0; i < std::min(K, (IntType)candidates.size()); ++i) {
+        array.push_back(reorder_to_old_[candidates[i].second]);
+    }
+    return array;
+    */
+
+    // optimized reranker
+
+    std::vector<std::pair<FloatType, IntType>> candidates;
+    while (!nearest_neighbours.empty()) {
+        candidates.push_back({0, nearest_neighbours.top().second});
+        nearest_neighbours.pop();
+    }
+    IntType cursz = candidates.size();
+    IntType i = 0;
+
+    if (i + 7 < cursz) {
+        _mm_prefetch((char*)(data + candidates[i].second * SIZE), _MM_HINT_T0);
+        _mm_prefetch((char*)(data + candidates[i + 1].second * SIZE), _MM_HINT_T0);
+        _mm_prefetch((char*)(data + candidates[i + 2].second * SIZE), _MM_HINT_T0);
+        _mm_prefetch((char*)(data + candidates[i + 3].second * SIZE), _MM_HINT_T0);
+        _mm_prefetch((char*)(data + candidates[i + 4].second * SIZE), _MM_HINT_T0);
+        _mm_prefetch((char*)(data + candidates[i + 5].second * SIZE), _MM_HINT_T0);
+        _mm_prefetch((char*)(data + candidates[i + 6].second * SIZE), _MM_HINT_T0);
+        _mm_prefetch((char*)(data + candidates[i + 7].second * SIZE), _MM_HINT_T0);
+    }
+
+    for (; i + 7 < cursz; i += 8) {
+        if (i + 15 < cursz) {
+            _mm_prefetch((char*)(data + candidates[i + 8].second * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + candidates[i + 9].second * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + candidates[i + 10].second * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + candidates[i + 11].second * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + candidates[i + 12].second * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + candidates[i + 13].second * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + candidates[i + 14].second * SIZE), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + candidates[i + 15].second * SIZE), _MM_HINT_T0);
+        }
+        space_.DistanceBatch8(
+            query, data + SIZE * candidates[i].second, data + SIZE * candidates[i + 1].second,
+            data + SIZE * candidates[i + 2].second, data + SIZE * candidates[i + 3].second,
+            data + SIZE * candidates[i + 4].second, data + SIZE * candidates[i + 5].second,
+            data + SIZE * candidates[i + 6].second, data + SIZE * candidates[i + 7].second,
+            &candidates[i].first, &candidates[i + 1].first, &candidates[i + 2].first,
+            &candidates[i + 3].first, &candidates[i + 4].first, &candidates[i + 5].first,
+            &candidates[i + 6].first, &candidates[i + 7].first);
+    }
+
+    for (; i < cursz; ++i) {
+        candidates[i].first = space_.Distance(query, data + SIZE * candidates[i].second);
     }
     std::sort(candidates.begin(), candidates.end());
     std::vector<IntType> array;
@@ -356,6 +651,7 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
     list = (IntType**)(aligned_alloc(ALIGN64, size_ * sizeof(IntType*)));
     list0 = (IntType*)(aligned_alloc(ALIGN64, size_ * (maxM0_ + 1) * sizeof(IntType)));
 
+    IntType degree_sum = 0;
     for (IntType node = 0; node < size_; ++node) {
         IntType level_number;
         ReadBinaryInt(level_number);
@@ -366,6 +662,9 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
         for (IntType level = 0; level < level_number; ++level) {
             IntType neighbour_number;
             ReadBinaryInt(neighbour_number);
+            if (level == 0) {
+                degree_sum += neighbour_number;
+            }
             IntType* pointer;
             if (level == 0) {
                 pointer = (IntType*)(list0 + (maxM0_ + 1) * node);
@@ -381,6 +680,8 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
             }
         }
     }
+    std::cout << "avg degree " << static_cast<FloatType>(degree_sum) / size_ << "\n";
+    std::cout << "maxM: " << maxM_ << ", maxM0: " << maxM0_ << "\n";
 
     IntType reorder_old_size;
     ReadBinaryInt(reorder_old_size);
@@ -406,4 +707,7 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
             ReadBinaryFloat(pointer[i]);
         }
     }
+
+    search_neighbors = (IntType*)aligned_alloc(ALIGN64, maxM0_ * sizeof(IntType));
+    search_distances = (FloatType*)aligned_alloc(ALIGN64, maxM0_ * sizeof(FloatType));
 }
