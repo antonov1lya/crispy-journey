@@ -121,6 +121,19 @@ void find_ef(std::ofstream& out, HNSWInference<SPACE>& hnsw) {
     std::cout << "};\n";
 }
 
+// void warmup_unpredictable() {
+//     std::random_device rd_warmup;
+//     std::mt19937 gen_warmup(rd_warmup());
+//     std::uniform_real_distribution<> dis_warmup(0, 1000);
+
+//     double dummy = 0;
+//     for (int i = 0; i < 10000000; ++i) {
+//         double x = dis_warmup(gen_warmup);
+//         dummy += sin(x) * cos(x);
+//     }
+//     std::cout << "warmup " << dummy << "\n";
+// }
+
 void Benchmark() {
     std::ifstream in(std::string("indexes/") + dataset_name + std::string("/base.bin"),
                      std::ios::binary);
@@ -170,11 +183,15 @@ void Benchmark() {
 #endif
 
     std::cout << "WARMUP\n";
-    std::ofstream print(std::string("logs/") + dataset_name + std::string("/tmp.txt"));
-    std::vector<int> grid{100};
-    for (int i : grid) {
-        std::cout << i << "\n";
-        evaluate(print, hnsw, i);
+    std::ofstream print(std::string("logs/") + dataset_name + std::string("/benchmark.txt"));
+
+    for(int _=0; _<10; _++)
+    {
+        std::vector<int> grid{650};
+        for (int i : grid) {
+            std::cout << i << "\n";
+            evaluate(print, hnsw, i);
+        }
     }
     print.close();
 }
@@ -210,8 +227,9 @@ void Reorder() {
 
     hnsw.ReOrdering();
 
-    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/reordered.bin"),
-                      std::ios::binary);
+    std::ofstream out(
+        std::string("indexes/") + dataset_name + std::string("/local_search_sum_log_abs_30.bin"),
+        std::ios::binary);
     hnsw.Save(out);
     out.close();
 }

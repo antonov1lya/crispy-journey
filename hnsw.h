@@ -476,6 +476,7 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
         }
     }
     auto ScoreF = [=](int x, int y) {
+        // return abs(reorder_to_new_[x] - reorder_to_new_[y]);
         return log(static_cast<long double>(abs(reorder_to_new_[x] - reorder_to_new_[y])));
     };
 
@@ -504,7 +505,7 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
     }
     std::cout << sum << "\n";
     std::cout << "START\n";
-    for (int _ = 0; _ < 10; _++) {
+    for (int _ = 0; _ < 30; _++) {
         std::cout << _ << "\n";
         for (int i = 0; i < size_; ++i) {
             if (i % 10000 == 0) {
@@ -544,9 +545,9 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
 
 template <typename Space>
 inline void HNSW<Space>::ReOrdering() {
-    // SumOfModulesReOrdering();
+    SumOfModulesReOrdering();
     // BFSReOrdering();
-    MSTReOrdering();
+    // MSTReOrdering();
     GraphReWrite();
 }
 
