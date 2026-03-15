@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string.h>
+#include <sys/mman.h>
 
 #include <cmath>
 #include <queue>
@@ -182,4 +183,26 @@ void MatVecMul(const FloatType* __restrict matrix, const FloatType* __restrict v
         }
         result[i] = sum;
     }
+}
+
+void* HugeAlloc(size_t total_size_bytes) {
+    size_t hugepage_size = 2 * 1024 * 1024;
+    size_t size = (total_size_bytes + hugepage_size - 1) & ~(hugepage_size - 1);
+    void* ptr =
+        mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, -1, 0);
+    std::cout << ptr << "\n";
+    return ptr;
+}
+
+void HugeDealloc(void* ptr, size_t total_size_bytes) {
+    size_t hugepage_size = 2 * 1024 * 1024;
+    size_t size = (total_size_bytes + hugepage_size - 1) & ~(hugepage_size - 1);
+    munmap(ptr, size);
+}
+
+#define ALIGN64 64
+void* MyAlignedAlloc(size_t size) {
+    size_t aligned_size = (size + ALIGN64 - 1) & ~(ALIGN64 - 1);
+    void* ptr = aligned_alloc(ALIGN64, aligned_size);
+    return ptr;
 }

@@ -1,25 +1,14 @@
 #pragma once
 
 #include <string.h>
-#include <sys/mman.h>
 
 #include "primitives.h"
 #include "third_party/faiss/faiss/impl/pq_code_distance/pq_code_distance-avx2.h"
 
-void* HugeAlloc(size_t total_size_bytes) {
-    size_t hugepage_size = 2 * 1024 * 1024;
-    size_t size = (total_size_bytes + hugepage_size - 1) & ~(hugepage_size - 1);
-    void* ptr =
-        mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, -1, 0);
-    std::cout << ptr << "\n";
-    return ptr;
-}
-
 template <typename Space>
 struct HNSWInference {
     HNSWInference(std::ifstream& file, std::ifstream& file_data);
-    ~HNSWInference() {
-    }
+    ~HNSWInference();
     void LoadPQ(std::ifstream& file_data_pq, std::ifstream& file_centroids);
     void LoadPQMatrix(std::ifstream& file_matrix);
     void LoadReRankMatrix(std::ifstream& file_matrix);
@@ -50,24 +39,24 @@ struct HNSWInference {
 
     Space space_;
 
-    FloatType* data;
-    IntType* list0;
-    IntType** list;
-    IntType* was_;
+    FloatType* data = nullptr;
+    IntType* list0 = nullptr;
+    IntType** list = nullptr;
+    IntType* was_ = nullptr;
 
-    uint8_t* quantized_data;
-    FloatType* centroids;
+    uint8_t* quantized_data = nullptr;
+    FloatType* centroids = nullptr;
     // std::array<std::array<FloatType, 256>, SUBSPACES> pq_table;
     alignas(32) float pq_table[SUBSPACES][256];
-    FloatType* matrix_PQ;
-    FloatType* vector_PQ;
+    FloatType* matrix_PQ = nullptr;
+    FloatType* vector_PQ = nullptr;
     bool need_mm_PQ = false;
-    FloatType* matrix_rerank;
-    FloatType* vector_rerank;
+    FloatType* matrix_rerank = nullptr;
+    FloatType* vector_rerank = nullptr;
     bool need_mm_rerank = false;
 
-    IntType* search_neighbors;
-    FloatType* search_distances;
+    IntType* search_neighbors = nullptr;
+    FloatType* search_distances = nullptr;
 };
 
 template <typename Space>
@@ -87,23 +76,23 @@ inline void HNSWInference<Space>::LoadPQ(std::ifstream& file_data_pq,
         }
     }
 
-    centroids = (FloatType*)aligned_alloc(ALIGN64, SUBSPACES * BITS * SUBSIZE * sizeof(FloatType));
+    centroids = (FloatType*)MyAlignedAlloc(SUBSPACES * BITS * SUBSIZE * sizeof(FloatType));
     file_centroids.read(reinterpret_cast<char*>(centroids),
                         SUBSPACES * BITS * SUBSIZE * sizeof(FloatType));
 }
 
 template <typename Space>
 inline void HNSWInference<Space>::LoadPQMatrix(std::ifstream& file_matrix) {
-    vector_PQ = (FloatType*)aligned_alloc(ALIGN64, SIZE * sizeof(FloatType));
-    matrix_PQ = (FloatType*)aligned_alloc(ALIGN64, SIZE * SIZE * sizeof(FloatType));
+    vector_PQ = (FloatType*)MyAlignedAlloc(SIZE * sizeof(FloatType));
+    matrix_PQ = (FloatType*)MyAlignedAlloc(SIZE * SIZE * sizeof(FloatType));
     file_matrix.read(reinterpret_cast<char*>(matrix_PQ), SIZE * SIZE * sizeof(FloatType));
     need_mm_PQ = true;
 }
 
 template <typename Space>
 inline void HNSWInference<Space>::LoadReRankMatrix(std::ifstream& file_matrix) {
-    vector_rerank = (FloatType*)aligned_alloc(ALIGN64, SIZE * sizeof(FloatType));
-    matrix_rerank = (FloatType*)aligned_alloc(ALIGN64, SIZE * SIZE * sizeof(FloatType));
+    vector_rerank = (FloatType*)MyAlignedAlloc(SIZE * sizeof(FloatType));
+    matrix_rerank = (FloatType*)MyAlignedAlloc(SIZE * SIZE * sizeof(FloatType));
     file_matrix.read(reinterpret_cast<char*>(matrix_rerank), SIZE * SIZE * sizeof(FloatType));
     need_mm_rerank = true;
 }
@@ -420,15 +409,16 @@ inline QueueLess HNSWInference<Space>::SearchLayer(FloatType* query, IntType ent
 
         IntType cursz = pointer[0];
 
-        _mm_prefetch((char*)(was_ + *(pointer + 1)), _MM_HINT_T0);
-        _mm_prefetch((char*)(data + (*(pointer + 1)) * SIZE), _MM_HINT_T0);
-
+        if (cursz >= 1) {
+            _mm_prefetch((char*)(was_ + *(pointer + 1)), _MM_HINT_T0);
+            _mm_prefetch((char*)(data + (*(pointer + 1)) * SIZE), _MM_HINT_T0);
+        }
         for (IntType i = 1; i <= cursz; ++i) {
             IntType next = pointer[i];
-
-            _mm_prefetch((char*)(was_ + *(pointer + i + 1)), _MM_HINT_T0);
-            _mm_prefetch((char*)(data + (*(pointer + i + 1)) * SIZE), _MM_HINT_T0);
-
+            if (i != cursz) {
+                _mm_prefetch((char*)(was_ + *(pointer + i + 1)), _MM_HINT_T0);
+                _mm_prefetch((char*)(data + (*(pointer + i + 1)) * SIZE), _MM_HINT_T0);
+            }
             if (was_[next] != current_was_) {
                 was_[next] = current_was_;
                 furthest_distance = nearest_neighbours.top().first;
@@ -480,16 +470,17 @@ inline QueueLess HNSWInference<Space>::SearchLayerPQ(FloatType* query, IntType e
         }
 
         IntType cursz = pointer[0];
-
-        _mm_prefetch((char*)(was_ + *(pointer + 1)), _MM_HINT_T0);
-        _mm_prefetch((char*)(quantized_data + (*(pointer + 1)) * SUBSPACES), _MM_HINT_T0);
-
+        if (cursz >= 1) {
+            _mm_prefetch((char*)(was_ + *(pointer + 1)), _MM_HINT_T0);
+            _mm_prefetch((char*)(quantized_data + (*(pointer + 1)) * SUBSPACES), _MM_HINT_T0);
+        }
         for (IntType i = 1; i <= cursz; ++i) {
             IntType next = pointer[i];
-
-            _mm_prefetch((char*)(was_ + *(pointer + i + 1)), _MM_HINT_T0);
-            _mm_prefetch((char*)(quantized_data + (*(pointer + i + 1)) * SUBSPACES), _MM_HINT_T0);
-
+            if (i != cursz) {
+                _mm_prefetch((char*)(was_ + *(pointer + i + 1)), _MM_HINT_T0);
+                _mm_prefetch((char*)(quantized_data + (*(pointer + i + 1)) * SUBSPACES),
+                             _MM_HINT_T0);
+            }
             if (was_[next] != current_was_) {
                 was_[next] = current_was_;
                 furthest_distance = nearest_neighbours.top().first;
@@ -757,21 +748,19 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
     ReadBinaryInt(max_level_);
     IntType dim;
     ReadBinaryInt(dim);
-    was_ = (IntType*)aligned_alloc(ALIGN64, size_ * sizeof(IntType));
+    was_ = (IntType*)MyAlignedAlloc(size_ * sizeof(IntType));
     memset(was_, 0, size_ * sizeof(int));
-
     data = (FloatType*)HugeAlloc(size_ * SIZE * sizeof(FloatType));
+    list = (IntType**)(malloc(size_ * sizeof(IntType*)));
+    memset(list, 0, size_ * sizeof(IntType*));
 
-    list = (IntType**)(aligned_alloc(ALIGN64, size_ * sizeof(IntType*)));
-    list0 = (IntType*)(aligned_alloc(ALIGN64, size_ * (maxM0_ + 1) * sizeof(IntType)));
-
+    list0 = (IntType*)(malloc(size_ * (maxM0_ + 1) * sizeof(IntType)));
     IntType degree_sum = 0;
     for (IntType node = 0; node < size_; ++node) {
         IntType level_number;
         ReadBinaryInt(level_number);
         if (level_number > 1) {
-            list[node] = (IntType*)(aligned_alloc(
-                ALIGN4, (level_number - 1) * (maxM_ + 1) * sizeof(IntType)));
+            list[node] = (IntType*)(malloc((level_number - 1) * (maxM_ + 1) * sizeof(IntType)));
         }
         for (IntType level = 0; level < level_number; ++level) {
             IntType neighbour_number;
@@ -822,6 +811,49 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
         }
     }
 
-    search_neighbors = (IntType*)aligned_alloc(ALIGN64, maxM0_ * sizeof(IntType));
-    search_distances = (FloatType*)aligned_alloc(ALIGN64, maxM0_ * sizeof(FloatType));
+    search_neighbors = (IntType*)malloc(2 * maxM0_ * sizeof(IntType));
+    search_distances = (FloatType*)malloc(2 * maxM0_ * sizeof(FloatType));
+}
+
+template <typename Space>
+inline HNSWInference<Space>::~HNSWInference() {
+    if (data) {
+        HugeDealloc(data, size_ * SIZE * sizeof(FloatType));
+    }
+    if (list0) {
+        free(list0);
+    }
+    if (list) {
+        for (IntType node = 0; node < size_; ++node) {
+            free(list[node]);
+        }
+        free(list);
+    }
+    if (was_) {
+        free(was_);
+    }
+    if (quantized_data) {
+        HugeDealloc(quantized_data, SUBSPACES * size_ * sizeof(uint8_t));
+    }
+    if (centroids) {
+        free(centroids);
+    }
+    if (matrix_PQ) {
+        free(matrix_PQ);
+    }
+    if (vector_PQ) {
+        free(vector_PQ);
+    }
+    if (matrix_rerank) {
+        free(matrix_rerank);
+    }
+    if (vector_rerank) {
+        free(vector_rerank);
+    }
+    if (search_neighbors) {
+        free(search_neighbors);
+    }
+    if (search_distances) {
+        free(search_distances);
+    }
 }

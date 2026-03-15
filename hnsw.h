@@ -29,7 +29,7 @@ struct HNSW {
         was_ = std::vector<IntType>(max_elements_);
         graph_.reserve(max_elements_);
         data_long_ =
-            static_cast<FloatType*>(aligned_alloc(64, (max_elements * SIZE) * sizeof(FloatType)));
+            static_cast<FloatType*>(MyAlignedAlloc((max_elements * SIZE) * sizeof(FloatType)));
         reorder_to_new_.resize(max_elements);
         reorder_to_old_.resize(max_elements);
         for (int i = 0; i < max_elements; ++i) {
@@ -41,7 +41,9 @@ struct HNSW {
     }
     HNSW(std::ifstream& file, std::ifstream& file_data);
     ~HNSW() {
-        free(data_long_);
+        if (data_long_) {
+            free(data_long_);
+        }
     }
     void Add(int level);
     QueueLess SearchLayer(FloatType* query, IntType enter_point, IntType ef, IntType level);
@@ -70,7 +72,7 @@ struct HNSW {
     IntType current_was_ = 0;
     IntType max_elements_;
     int max_level_ = -1;
-    FloatType* data_long_;
+    FloatType* data_long_ = nullptr;
     std::vector<IntType> was_;
     std::vector<Node> graph_;
 
