@@ -811,8 +811,8 @@ inline HNSWInference<Space>::HNSWInference(std::ifstream& file, std::ifstream& f
         }
     }
 
-    search_neighbors = (IntType*)malloc(2 * maxM0_ * sizeof(IntType));
-    search_distances = (FloatType*)malloc(2 * maxM0_ * sizeof(FloatType));
+    search_neighbors = (IntType*)malloc(maxM0_ * sizeof(IntType));
+    search_distances = (FloatType*)malloc(maxM0_ * sizeof(FloatType));
 }
 
 template <typename Space>
