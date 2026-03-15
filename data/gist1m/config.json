@@ -1,0 +1,24 @@
+{
+    "title": "",
+    "data": [
+        {
+            "file": "../data/gist1m/baseline.csv",
+            "title": "base"
+        },
+        {
+            "file": "../data/gist1m/baseline+pq.csv",
+            "title": "base+PQ"
+        },
+        {
+            "file": "../data/gist1m/baseline+pq+batch.csv",
+            "title": "base+PQ+batching"
+        },
+        {
+            "file": "../data/gist1m/baseline+pq+batch+reordring.csv",
+            "title": "base+PQ+batching+reordering"
+        }
+    ],
+    "output_file_frontier": "../data/gist1m/frontier.png",
+    "output_file_ablation": "../data/gist1m/ablation.png",
+    "query": 1000
+}
