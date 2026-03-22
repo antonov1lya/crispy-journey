@@ -2,6 +2,10 @@
     "title": "",
     "data": [
         {
+            "file": "../data/gist1m/hnswlib.csv",
+            "title": "hnswlib"
+        },
+        {
             "file": "../data/gist1m/baseline.csv",
             "title": "base"
         },
