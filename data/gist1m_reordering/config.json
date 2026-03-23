@@ -1,0 +1,28 @@
+{
+    "title": "",
+    "data": [
+        {
+            "file": "../data/gist1m_reordering/no_reorder.csv",
+            "title": "no reordering"
+        },
+        {
+            "file": "../data/gist1m_reordering/bfs.csv",
+            "title": "bfs"
+        },
+        {
+            "file": "../data/gist1m_reordering/sum_abs.csv",
+            "title": "sum abs"
+        },
+        {
+            "file": "../data/gist1m_reordering/mst.csv",
+            "title": "mst"
+        },
+        {
+            "file": "../data/gist1m_reordering/sum_log.csv",
+            "title": "sum log"
+        }
+    ],
+    "output_file_frontier": "../data/gist1m_reordering/frontier.png",
+    "output_file_ablation": "../data/gist1m_reordering/ablation.png",
+    "query": 1000
+}
