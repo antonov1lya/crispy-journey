@@ -7,19 +7,19 @@
         },
         {
             "file": "../data/gist1m_reordering/bfs.csv",
-            "title": "bfs"
+            "title": "BFS"
         },
         {
             "file": "../data/gist1m_reordering/sum_abs.csv",
-            "title": "sum abs"
+            "title": "MLINA (local search)"
         },
         {
             "file": "../data/gist1m_reordering/mst.csv",
-            "title": "mst"
+            "title": "MST"
         },
         {
             "file": "../data/gist1m_reordering/sum_log.csv",
-            "title": "sum log"
+            "title": "MLOGA (local seach)"
         }
     ],
     "output_file_frontier": "../data/gist1m_reordering/frontier.png",

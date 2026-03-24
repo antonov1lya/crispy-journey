@@ -1,0 +1,28 @@
+{
+    "title": "",
+    "data": [
+        {
+            "file": "../data/sift1m_reordering/base.csv",
+            "title": "no reordering"
+        },
+        {
+            "file": "../data/sift1m_reordering/sum_abs_30.csv",
+            "title": "MLINA (local search)"
+        },
+        {
+            "file": "../data/sift1m_reordering/bfs.csv",
+            "title": "BFS"
+        },
+        {
+            "file": "../data/sift1m_reordering/sum_log30.csv",
+            "title": "MLOGA (local search)"
+        },
+        {
+            "file": "../data/sift1m_reordering/mst.csv",
+            "title": "MST"
+        }
+    ],
+    "output_file_frontier": "../data/sift1m_reordering/frontier.png",
+    "output_file_ablation": "../data/sift1m_reordering/ablation.png",
+    "query": 10000
+}
