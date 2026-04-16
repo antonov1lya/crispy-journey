@@ -57,6 +57,7 @@ struct HNSW {
     std::vector<IntType> Search(FloatType* query, IntType K, IntType ef);
     void BFSReOrdering();
     void MSTReOrdering();
+    template <typename reorderT>
     void SumOfModulesReOrdering();
     void GraphReWrite();
     void ReOrdering();
@@ -113,7 +114,7 @@ void HNSW<Space>::Add(int level) {
                                                   &(data_long_[neighbour * SIZE])),
                                   neighbour);
                 }
-                graph_[next].neighbors_[i] = SelectNeighbours(index, queue, maxM, maxM);
+                graph_[next].neighbors_[i] = SelectNeighbours(next, queue, maxM, maxM);
             }
         }
     }
@@ -470,6 +471,7 @@ inline void HNSW<Space>::GraphReWrite() {
 }
 
 template <typename Space>
+template <typename reorderT>
 inline void HNSW<Space>::SumOfModulesReOrdering() {
     std::vector<std::vector<IntType>> graph_inv_(size_);
     for (int i = 0; i < size_; ++i) {
@@ -478,12 +480,12 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
         }
     }
     auto ScoreF = [=](int x, int y) {
-        // return abs(reorder_to_new_[x] - reorder_to_new_[y]);
-        return log(static_cast<long double>(abs(reorder_to_new_[x] - reorder_to_new_[y])));
+        return abs(reorder_to_new_[x] - reorder_to_new_[y]);
+        // return log(static_cast<reorderT>(abs(reorder_to_new_[x] - reorder_to_new_[y])));
     };
 
     auto GetScore = [=](int i, int j) {
-        long double score = 0;
+        reorderT score = 0;
         for (int k : graph_[i].neighbors_[0]) {
             score += ScoreF(i, k);
         }
@@ -499,7 +501,7 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
         return score;
     };
 
-    long double sum = 0;
+    reorderT sum = 0;
     for (int i = 0; i < size_; ++i) {
         for (int j : graph_[i].neighbors_[0]) {
             sum += ScoreF(i, j);
@@ -516,12 +518,12 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
             for (int j = reorder_to_new_[i] + 1; (j <= reorder_to_new_[i] + 30) and (j < size_);
                  ++j) {
                 int64_t l = reorder_to_old_[j];
-                long double mn_score = 0;
+                reorderT mn_score = 0;
                 int64_t index = -1;
                 for (int ne : graph_[i].neighbors_[0]) {
-                    int64_t score_old = GetScore(l, ne);
+                    reorderT score_old = GetScore(l, ne);
                     std::swap(reorder_to_new_[l], reorder_to_new_[ne]);
-                    int64_t score_new = GetScore(l, ne);
+                    reorderT score_new = GetScore(l, ne);
                     if (score_new - score_old < mn_score) {
                         mn_score = score_new - score_old;
                         index = ne;
@@ -547,9 +549,9 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
 
 template <typename Space>
 inline void HNSW<Space>::ReOrdering() {
-    SumOfModulesReOrdering();
+    // SumOfModulesReOrdering<int64_t>();
     // BFSReOrdering();
-    // MSTReOrdering();
+    MSTReOrdering();
     GraphReWrite();
 }
 
