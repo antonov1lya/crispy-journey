@@ -2,8 +2,9 @@
 
 // #define SIFT1M
 // #define GLOVE100
-#define GIST1M
+// #define GIST1M
 // #define DEEP1B
+#define FASHION_MNIST
 
 #define REORDER
 
@@ -31,12 +32,18 @@
 #define SPACE SpaceCosine
 #endif
 
+#ifdef FASHION_MNIST
+#define DATASET "fashion_mnist"
+#define SIZE 784
+#define SPACE SpaceL2
+#endif
+
 #define BITS 256
 
 #define SUBSPACES 32
 #define SUBSIZE (SIZE / SUBSPACES)
-#define PQ
-#define BATCH
+// #define PQ
+// #define BATCH
 
 // #define FIND_EF
-#define EF_R 600
+#define EF_R 2000
