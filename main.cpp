@@ -1,3 +1,4 @@
+#include <cassert>
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -15,7 +16,7 @@ std::string dataset_name = DATASET;
 std::mt19937 gen(0);
 std::uniform_real_distribution<FloatType> dist(0, 1);
 
-FloatType* query_data;
+FloatType* query_data = nullptr;
 std::vector<std::set<IntType>> groundtruth_data;
 
 const int kNN = 10;
@@ -70,15 +71,14 @@ double evaluate(std::ofstream& out, HNSWInference<SPACE>& hnsw, size_t ef) {
         for (auto x : res) {
             count += groundtruth_data[i].count(x);
         }
+        assert(res.size() == kNN);
         count /= kNN;
         result += count;
     }
     auto end = std::chrono::steady_clock::now();
     auto elapsed_sec = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
-    out << "recall " << result / n << "\n";
-    out << "ef " << ef << "\n";
-    out << "avg dist computations " << hnsw.space_.GetComputationsNumber() / n << "\n";
-    out << "time " << elapsed_sec.count() << "\n";
+    out << result / n << "," << ef << "," << hnsw.space_.GetComputationsNumber() / n << ","
+        << elapsed_sec.count() << "\n";
     return result / n;
 }
 
@@ -120,19 +120,6 @@ void find_ef(std::ofstream& out, HNSWInference<SPACE>& hnsw) {
     }
     std::cout << "};\n";
 }
-
-// void warmup_unpredictable() {
-//     std::random_device rd_warmup;
-//     std::mt19937 gen_warmup(rd_warmup());
-//     std::uniform_real_distribution<> dis_warmup(0, 1000);
-
-//     double dummy = 0;
-//     for (int i = 0; i < 10000000; ++i) {
-//         double x = dis_warmup(gen_warmup);
-//         dummy += sin(x) * cos(x);
-//     }
-//     std::cout << "warmup " << dummy << "\n";
-// }
 
 void Benchmark() {
     std::ifstream in(std::string("indexes/") + dataset_name + std::string("/base.bin"),
@@ -183,12 +170,14 @@ void Benchmark() {
 #endif
 
     std::cout << "WARMUP\n";
-    std::ofstream print(std::string("logs/") + dataset_name + std::string("/benchmark.txt"));
+    std::ofstream print(std::string("logs/") + dataset_name + std::string("/baseline_1.csv"));
+    print << "recall,ef,dst,time\n";
 
-    for(int _=0; _<10; _++)
-    {
-        std::vector<int> grid{650};
-        for (int i : grid) {
+    std::vector<int> grid{
+        123, 134, 147, 162, 180, 204, 236, 281, 360, 506,
+    };
+    for (int i : grid) {
+        for (int _ = 0; _ < 10; _++) {
             std::cout << i << "\n";
             evaluate(print, hnsw, i);
         }
@@ -317,6 +306,7 @@ void Create() {
 
 int main() {
     // DO: sudo sysctl vm.nr_hugepages=2048
+    // taskset -c 1 /home/ilya/crispy-journey/build/anns
     // Create();
     Benchmark();
     // Reorder();
@@ -324,6 +314,10 @@ int main() {
     // ReadReorder();
     // SSG();
     // BuildKNN();
+
+    if (query_data) {
+        free(query_data);
+    }
 
     return 0;
 }

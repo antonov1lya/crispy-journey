@@ -1,0 +1,24 @@
+{
+    "title": "",
+    "data": [
+        {
+            "file": "../data/sift1m/hnswlib.csv",
+            "title": "hnswlib"
+        },
+        {
+            "file": "../data/sift1m/base.csv",
+            "title": "base"
+        },
+        {
+            "file": "../data/sift1m/base+batch.csv",
+            "title": "base+batching"
+        },
+        {
+            "file": "../data/sift1m/base+batch+reordering.csv",
+            "title": "base+batching+reordering"
+        }
+    ],
+    "output_file_frontier": "../data/sift1m/frontier.png",
+    "output_file_ablation": "../data/sift1m/ablation.png",
+    "query": 10000
+}
