@@ -1,0 +1,24 @@
+{
+    "title": "",
+    "data": [
+        {
+            "file": "../data/glove100/hnswlib.csv",
+            "title": "hnswlib"
+        },
+        {
+            "file": "../data/glove100/base.csv",
+            "title": "base"
+        },
+        {
+            "file": "../data/glove100/base+batching.csv",
+            "title": "base+batching"
+        },
+        {
+            "file": "../data/glove100/base+batching+reordering.csv",
+            "title": "base+batching+reordering"
+        }
+    ],
+    "output_file_frontier": "../data/glove100/frontier.png",
+    "output_file_ablation": "../data/glove100/ablation.png",
+    "query": 10000
+}

@@ -127,6 +127,61 @@ struct SpaceCosine {
         }
         return 1 - distance;
     }
+    void DistanceBatch2(const FloatType* q, const FloatType* x1, const FloatType* x2, FloatType* r1,
+                        FloatType* r2) {
+        computations_ += 2;
+        FloatType d1 = 0, d2 = 0;
+        for (IntType i = 0; i < SIZE; ++i) {
+            d1 += q[i] * x1[i];
+            d2 += q[i] * x2[i];
+        }
+        *r1 = 1 - d1;
+        *r2 = 1 - d2;
+    }
+    void DistanceBatch4(const FloatType* q, const FloatType* x1, const FloatType* x2,
+                        const FloatType* x3, const FloatType* x4, FloatType* r1, FloatType* r2,
+                        FloatType* r3, FloatType* r4) {
+        computations_ += 4;
+        FloatType d1 = 0, d2 = 0, d3 = 0, d4 = 0;
+        for (IntType i = 0; i < SIZE; ++i) {
+            d1 += q[i] * x1[i];
+            d2 += q[i] * x2[i];
+            d3 += q[i] * x3[i];
+            d4 += q[i] * x4[i];
+        }
+
+        *r1 = 1 - d1;
+        *r2 = 1 - d2;
+        *r3 = 1 - d3;
+        *r4 = 1 - d4;
+    }
+    void DistanceBatch8(const FloatType* q, const FloatType* x1, const FloatType* x2,
+                        const FloatType* x3, const FloatType* x4, const FloatType* x5,
+                        const FloatType* x6, const FloatType* x7, const FloatType* x8,
+                        FloatType* r1, FloatType* r2, FloatType* r3, FloatType* r4, FloatType* r5,
+                        FloatType* r6, FloatType* r7, FloatType* r8) {
+        computations_ += 8;
+        FloatType d1 = 0, d2 = 0, d3 = 0, d4 = 0, d5 = 0, d6 = 0, d7 = 0, d8 = 0;
+        for (IntType i = 0; i < SIZE; ++i) {
+            d1 += q[i] * x1[i];
+            d2 += q[i] * x2[i];
+            d3 += q[i] * x3[i];
+            d4 += q[i] * x4[i];
+            d5 += q[i] * x5[i];
+            d6 += q[i] * x6[i];
+            d7 += q[i] * x7[i];
+            d8 += q[i] * x8[i];
+        }
+
+        *r1 = 1 - d1;
+        *r2 = 1 - d2;
+        *r3 = 1 - d3;
+        *r4 = 1 - d4;
+        *r5 = 1 - d5;
+        *r6 = 1 - d6;
+        *r7 = 1 - d7;
+        *r8 = 1 - d8;
+    }
     FloatType DistanceSubspace(const FloatType* x, const FloatType* y) {
         FloatType distance = 0;
         for (IntType i = 0; i < SUBSIZE; ++i) {

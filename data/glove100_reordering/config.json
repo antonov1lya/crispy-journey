@@ -1,0 +1,28 @@
+{
+    "title": "",
+    "data": [
+        {
+            "file": "../data/glove100_reordering/base.csv",
+            "title": "no reordering"
+        },
+        {
+            "file": "../data/glove100_reordering/sum_abs.csv",
+            "title": "MLINA (local search)"
+        },
+        {
+            "file": "../data/glove100_reordering/bfs.csv",
+            "title": "BFS"
+        },
+        {
+            "file": "../data/glove100_reordering/sum_log.csv",
+            "title": "MLOGA (local search)"
+        },
+        {
+            "file": "../data/glove100_reordering/mst.csv",
+            "title": "MST"
+        }
+    ],
+    "output_file_frontier": "../data/glove100_reordering/frontier.png",
+    "output_file_ablation": "../data/glove100_reordering/ablation.png",
+    "query": 10000
+}
