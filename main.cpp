@@ -122,8 +122,9 @@ void find_ef(std::ofstream& out, HNSWInference<SPACE>& hnsw) {
 }
 
 void Benchmark() {
-    std::ifstream in(std::string("indexes/") + dataset_name + std::string("/base.bin"),
-                     std::ios::binary);
+    std::ifstream in(
+        std::string("indexes/") + dataset_name + std::string(BENCHMARK_TASK_INDEX_FILE),
+        std::ios::binary);
     std::ifstream in_data(std::string("datasets/") + dataset_name + std::string("/data.bin"),
                           std::ios::binary);
     HNSWInference<SPACE> hnsw(in, in_data);
@@ -170,12 +171,36 @@ void Benchmark() {
 #endif
 
     std::cout << "WARMUP\n";
-    std::ofstream print(std::string("logs/") + dataset_name + std::string("/baseline_1.csv"));
+    std::ofstream print(std::string("logs/") + dataset_name + std::string(BENCHMARK_TASK_LOG_FILE));
     print << "recall,ef,dst,time\n";
 
-    std::vector<int> grid{
-        123, 134, 147, 162, 180, 204, 236, 281, 360, 506,
-    };
+    std::vector<int> grid;
+
+    if (dataset_name == "sift1m") {
+        grid = {
+            22, 24, 26, 29, 32, 36, 41, 48, 60, 84,
+        };
+    }
+
+    if (dataset_name == "glove100") {
+        grid = {
+            159, 182, 212, 248, 293, 356, 443, 572, 789, 1261,
+        };
+    }
+
+    if (dataset_name == "gist1m") {
+#ifdef PQ
+        grid = {
+            71, 79, 85, 95, 106, 121, 137, 167, 214, 327,
+        };
+#endif
+#ifndef PQ
+        grid = {
+            123, 134, 147, 162, 180, 204, 236, 281, 360, 506,
+        };
+#endif
+    }
+
     for (int i : grid) {
         for (int _ = 0; _ < 10; _++) {
             std::cout << i << "\n";
@@ -217,7 +242,7 @@ void Reorder() {
     hnsw.ReOrdering();
 
     std::ofstream out(
-        std::string("indexes/") + dataset_name + std::string("/local_search_sum_log_abs_30.bin"),
+        std::string("indexes/") + dataset_name + std::string(REORDERING_TASK_INDEX_FILE),
         std::ios::binary);
     hnsw.Save(out);
     out.close();
@@ -298,7 +323,7 @@ void Create() {
         FloatType level = -std::log(dist(gen)) * el;
         hnsw.Add(level);
     }
-    std::ofstream out(std::string("indexes/") + dataset_name + std::string("/base.bin"),
+    std::ofstream out(std::string("indexes/") + dataset_name + std::string(CREATE_TASK_INDEX_FILE),
                       std::ios::binary);
     hnsw.Save(out);
     out.close();
@@ -307,13 +332,18 @@ void Create() {
 int main() {
     // DO: sudo sysctl vm.nr_hugepages=2048
     // taskset -c 1 /home/ilya/crispy-journey/build/anns
-    // Create();
+
+#ifdef CREATE_TASK
+    Create();
+#endif
+
+#ifdef BENCHMARK_TASK
     Benchmark();
-    // Reorder();
-    // PrintGraph();
-    // ReadReorder();
-    // SSG();
-    // BuildKNN();
+#endif
+
+#ifdef REORDER_TASK
+    Reorder();
+#endif
 
     if (query_data) {
         free(query_data);

@@ -480,8 +480,8 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
         }
     }
     auto ScoreF = [=](int x, int y) {
-        return abs(reorder_to_new_[x] - reorder_to_new_[y]);
-        // return log(static_cast<reorderT>(abs(reorder_to_new_[x] - reorder_to_new_[y])));
+        // return abs(reorder_to_new_[x] - reorder_to_new_[y]);
+        return log(static_cast<reorderT>(abs(reorder_to_new_[x] - reorder_to_new_[y])));
     };
 
     auto GetScore = [=](int i, int j) {
@@ -549,9 +549,18 @@ inline void HNSW<Space>::SumOfModulesReOrdering() {
 
 template <typename Space>
 inline void HNSW<Space>::ReOrdering() {
-    // SumOfModulesReOrdering<int64_t>();
-    // BFSReOrdering();
+#ifdef REORDERING_TYPE_LOCAL_SEARCH
+    SumOfModulesReOrdering<double>();
+#endif
+
+#ifdef REORDERING_TYPE_BFS
+    BFSReOrdering();
+#endif
+
+#ifdef REORDERING_TYPE_MST
     MSTReOrdering();
+#endif
+
     GraphReWrite();
 }
 
