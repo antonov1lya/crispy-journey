@@ -101,4 +101,3 @@ void LoadPQ(std::ifstream& file_data_pq, std::ifstream& file_centroids);
 void LoadPQMatrix(std::ifstream& file_matrix);
 ```
 
-`SearchPQ` оценивает расстояния по таблице PQ, затем при необходимости делает реранкинг по полным векторам. Это исследовательский код: основные параметры зашиты, а не вынесены в библиотечный API.
