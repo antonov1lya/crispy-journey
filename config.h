@@ -1,10 +1,27 @@
 #pragma once
 
-// #define SIFT1M
+// SELECT DATASET
+#define SIFT1M
 // #define GLOVE100
 // #define GIST1M
 // #define DEEP1B
-#define FASHION_MNIST
+// #define FASHION_MNIST
+
+// SELECT TASK
+// #define CREATE_TASK
+#define BENCHMARK_TASK
+// #define REORDER_TASK
+
+// REORDERING TYPE FOR REORDER_TASK
+#define REORDERING_TYPE_LOCAL_SEARCH
+// #define REORDERING_TYPE_BFS
+// #define REORDERING_TYPE_MST
+
+// FILE NAMES
+#define CREATE_TASK_INDEX_FILE "/base.bin"
+#define BENCHMARK_TASK_INDEX_FILE "/base.bin"
+#define BENCHMARK_TASK_LOG_FILE "/base.csv"
+#define REORDERING_TASK_INDEX_FILE "/reordering.bin"
 
 #define REORDER
 
